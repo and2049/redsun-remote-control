@@ -1,0 +1,16 @@
+{
+  "name": "redsun-remote-control",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "bun run apps/companion/src/cli.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.13",
+    "typescript": "5.8.2"
+  }
+}

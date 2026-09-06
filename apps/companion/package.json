@@ -1,0 +1,10 @@
+{
+  "name": "@redsun-remote/companion",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@simplewebauthn/server": "14.0.1",
+    "@redsun-remote/protocol": "workspace:*",
+    "effect": "4.0.0-rc.112"
+  }
+}
