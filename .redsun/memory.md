@@ -418,7 +418,16 @@ separate DB). Only the local one is the RC target; it had been started from `dev
 the RC commit and must be restarted from the feature branch. The redsun source CLI must
 run with `packages/cli` as working directory. The tailnet had MagicDNS enabled but no
 HTTPS certificates (empty `CertDomains`), which blocks the origin until the user enables
-them in the admin console. No enrollment, policy, Serve or service change was made.
+them in the admin console.
+
+First real phone test succeeded on 2026-09-06 via `bun run phone-test`: the user enabled
+tailnet HTTPS certificates, the script restarted the local source service, enrolled,
+imported, enabled RC, passed `check-backend` and applied the Serve mapping; an iPhone
+(Safari) registered a passkey, was approved by typed fingerprint, logged in and reached
+"Connected to backend" after Connect / refresh. This verifies Tailscale Serve preserving
+Host/Origin, browser WebAuthn JSON helpers, real discovery ACLs and live scoped attachment
+on Windows. Operations beyond connect, logout/recovery/disable teardown, background
+companion lifecycle and Ubuntu remain unverified live.
 
 ### Protected local backend import implementation
 
@@ -488,9 +497,9 @@ was reported by the user; phone-to-host connectivity has not been verified.
    HTTP validation/rate limits and CLI/auth route wiring implemented and tested on
    Windows. Policy/event teardown and control authorization are wired and tested with
    synthetic servers. Deployment preflight remains required before private exposure.
-5. Private deployment: host-side automation exists; blocked on enabling tailnet HTTPS
-   certificates, then the first real phone run. Independent background companion
-   lifecycle remains pending.
+5. Private deployment: first real phone connection verified 2026-09-06 through
+   `bun run phone-test` and Tailscale Serve. Independent background companion lifecycle
+   and live exercise of operations/teardown remain pending.
 6. Mobile completion: forms/permissions, moves and models/agents are available via
    structured diagnostic controls; polished UI remains deferred. Diagnostic refresh
    and basic retained-ID reconciliation exist, not comprehensive uncertain-write UX.
@@ -589,7 +598,8 @@ service. The companion adapter has not yet been exercised against an actual reds
 server process; its network tests use isolated Bun fixture servers.
 Graceful CLI signal handling remains unverified end to end on Windows; forced process
 termination/lease release and service-scope listener cleanup are integration-tested.
-No real redsun backend or phone test has run.
+A real phone connected to the real local redsun backend on 2026-09-06; see the
+phone-test automation section for what that run did and did not verify.
 Do not store credentials, private device names, or machine-specific setup files in
 the repository. No source from OpenCode has been copied; licensing selection for
 this repository remains open before importing upstream code or distributing it.
