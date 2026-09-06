@@ -32,7 +32,8 @@ with no commit-body description. Do not include unrelated user work.
   not backend readiness. Other paths return 404; unsupported health methods 405.
 - Scope release stops the listener. CLI interruption aborts the scope.
 - Passkey verification, in-memory session lifetime, backend attachment cores, and
-  protected backend handoff import exist, but no usable login/enrollment flow or operational backend connection,
+  protected backend handoff import exist. Local approval and initial owner-record
+  persistence cores also exist, but no usable login/enrollment flow or operational backend connection,
   UI, or Tailscale configuration exists.
 
 Approved dependencies: Effect, TypeScript, Bun types. Initial exact pins match the
@@ -113,6 +114,41 @@ This is not wired to cookies, login, HTTP routes, backend disable, or actual str
 Callers must issue tokens only after durable credential/counter updates and current
 enrollment checks; use signals for browser resources, never backend agent execution.
 Stream keepalives must not call authenticate merely to extend idle lifetime.
+
+### Local enrollment coordinator and initial owner persistence
+
+`auth/enrollment.ts` is an Effect-scoped coordinator around the passkey core.
+Only its local `open` method starts a five-minute enrollment window. Browser-facing
+options and proof verification require an open, unexpired window and a server-issued
+binding supplied by the future HTTP layer. Capacity counts in-flight options and
+pending proofs together. Wrong-browser attempts do not consume the matching request;
+matching verification attempts are single-use. Cancellation/new windows/scope exit
+invalidate outstanding ceremonies, including cryptography already in flight.
+
+Verified requests expose a 128-bit hexadecimal fingerprint derived from origin,
+random request ID, browser binding, owner user ID and verified credential identity/key.
+Local pending-request inspection returns only request IDs/fingerprints. Approval
+requires both to match; proof alone never creates an enrollment or browser session.
+The local open/cancel/approve methods are serialized. Once approval is admitted,
+its persistence is uninterruptible and cancellation waits; cancelling an enrollment
+window is not revoking a committed owner. Approval closes the window and succeeds
+only after persistence returns. Failures return fixed safe errors and cannot retry
+the same proof. Successful enrollment prevents reopening that coordinator.
+
+`storage/owner.ts` stores the approved fingerprint and credential together in a
+single no-overwrite `owner.json` under the protected companion directory. The strict
+v1 schema stores canonical HTTPS origin, user ID, public key, credential ID/counter
+and optional transports. Base64url must be canonical and counters fit WebAuthn uint32.
+Origin mismatch fails closed on load. No browser private key is stored. As with
+backend import, ambiguous filesystem publication failures require local inspection,
+not silent overwrite or assuming the destination was never published.
+
+Neither the coordinator nor owner creation is wired to CLI approval commands, HTTP,
+or backend disable/revocation. Production setup must load existing owner state before
+opening enrollment; no-overwrite creation remains the last defense against replacement.
+Counter updates, cross-process writer coordination, local reset/recovery and login
+session issuance remain pending. Stored public-key roundtrips are verified using
+real signed authentication fixtures on Windows; no real browser was enrolled.
 
 ## Architecture direction
 
@@ -238,8 +274,8 @@ rejected before creating the destination. No-argument CLI remains health-only.
 
 Windows permission and CLI behavior is tested with disposable synthetic fixtures
 outside the repository. Linux implementation is typechecked but has not run on Linux;
-do not describe cross-platform deployment as verified. Browser enrollment persistence,
-atomic updates/recovery, protected discovery, and operational loading remain pending.
+do not describe cross-platform deployment as verified. Initial owner-record creation
+exists; atomic updates/recovery, protected discovery, and operational loading remain pending.
 
 ### Earlier discovery audit
 
@@ -270,8 +306,9 @@ was reported by the user; phone-to-host connectivity has not been verified.
 3. Local vertical slice: scoped in-memory status/heartbeat attachment and protected
    backend handoff import implemented and fixture-tested on Windows. Protected discovery, supervision, sessions/prompts, scoped SSE
    and interruption remain pending. No remote exposure before authentication.
-4. Security: passkey crypto/challenge and session lifetime cores implemented and tested. Local approval,
-   durable enrollment, HTTP validation/rate limits, browser session wiring, local recovery,
+4. Security: passkey crypto/challenge, session lifetime, local approval coordinator,
+   and initial owner persistence implemented and tested. HTTP validation/rate limits,
+   approval CLI, counter updates, browser session wiring, local recovery,
    revocation wiring, and approved route/event surface remain pending.
 5. Private deployment: stable HTTPS origin, Serve setup, independent background
    companion lifecycle, real phone test. Pending.
@@ -341,7 +378,7 @@ browser-facing auth routes will be exposed during this step.
 
 Run from repository root: `bun install --frozen-lockfile`, `bun run typecheck`,
 `bun test`. Development: `bun run dev` (ephemeral loopback health listener only).
-Current verification: frozen install and typecheck pass; 133 tests, 0 failures,
+Current verification: frozen install and typecheck pass; 147 tests, 0 failures,
 including real WebAuthn registration and signed authentication for three algorithms,
 negative security cases, concurrency, invalidation, listener cleanup, and scoped
 attachment fixtures (redirect refusal, proxy isolation, identity/restart checks,
@@ -351,6 +388,9 @@ restart isolation, immutable policy capture, and Effect scope cleanup.
 Storage tests cover Windows ACL rejection, bounded reads/writes, linked-path
 rejection, no-overwrite publication and races, source preservation, strict handoff
 decoding, and actual CLI subprocess imports without credential output or listeners.
+Enrollment tests cover proof-before-approval, exact fingerprint matching, window
+expiry, cancellation/in-flight invalidation, concurrent capacity/approval, persistence
+failure and ordering, scope release, strict owner decoding and signed login after reload.
 Redsun verification run separately from its core directory:
 `bun run test ../server/test/remote-control.test.ts ../server/test/remote-admission.test.ts ../server/test/remote-projection.test.ts`
 passed 8 tests / 145 assertions. These use its isolated test harness, not the installed

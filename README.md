@@ -46,10 +46,12 @@ verification run before deployment.
 
 - `apps/companion`: local service and eventual authenticated backend gateway.
   Its `src/auth` modules implement passkey verification, single-use challenges, and
-  scoped session lifetimes, not usable login or local enrollment approval.
+  scoped session lifetimes, plus a local enrollment approval coordinator. Approval
+  commands and usable browser login are not wired yet.
   Its `src/backend` modules validate the pinned redsun RC contract and provide scoped
   status/heartbeat attachment. Its `src/storage` modules provide protected backend
-  handoff import. Automatic reconnection is not implemented; no backend credentials
+  handoff import and initial owner-credential persistence. Counter updates and recovery
+  remain pending. Automatic reconnection is not implemented; no backend credentials
   are loaded by the development command.
 - `apps/web`: reserved browser application boundary, pending upstream UI audit.
 - `packages/protocol`: browser-safe companion contracts.
