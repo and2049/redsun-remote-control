@@ -8,6 +8,7 @@ attachment, allowlisted remote operations and a dependency-free phone diagnostic
 are available in explicit `serve --backend` mode. Real-redsun, browser and Tailscale
 integration remain unverified. Complete the [phone-test preflight](docs/phone-test.md)
 before private exposure. Never use Funnel, a LAN binding or a public proxy.
+`bun run phone-test` automates the host side of that test after one confirmation.
 
 ## Development
 

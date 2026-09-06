@@ -238,6 +238,10 @@ Pinned redsun commit: `fa65c5f530e78509e53793a608e4a0654996b21e`
 redsun's `specs/remote-control-integration.md`. Reviewed it alongside schemas,
 authorization, status handlers, persistence, registration, and export code.
 
+Redsun commit `a02bda3a0b` (feature branch) additionally publishes the `.remote` sidecar
+through its protected private-file helper; the wire contract is unchanged. Earlier
+checkouts inherit the Windows state-directory ACL and fail companion discovery.
+
 The user approved a narrow maintained adapter instead of vendoring the full generated
 client. No sibling-source dependency or additional package was added. Update the pin
 and review schemas/capabilities when upgrading; never infer authority from the full
@@ -337,10 +341,11 @@ not paths, credentials or response bodies. It sends no heartbeat and starts no l
 backend, enrollment or policy change. An actual CLI subprocess is fixture-tested.
 See `docs/backend-attachment.md` for the contract and phone-test prerequisites.
 
-Windows live-integration risk: the pinned redsun discovery publisher uses filesystem
-`mode: 0600`, not explicit native owner-only ACL creation. Actual protection depends
-on inherited Windows ACLs and remains unverified. Do not weaken companion validation
-or silently repair runtime files. No live discovery/credential file was inspected.
+Windows live-integration finding (2026-09-06): the pinned publisher's `mode: 0600`
+sidecar inherited SYSTEM/Administrators/sandbox-group ACEs from the state directory,
+which the companion's owner-only reader rejects. Fixed in redsun `a02bda3a0b`, verified
+by its CLI test on Windows. Do not weaken companion validation or silently repair
+runtime files. No live credential file was inspected.
 
 ### Operational control and phone diagnostic
 
@@ -394,6 +399,26 @@ cover payload allowlisting, malformed events, bounded/redirect-free transport, m
 nonretry, concurrency/rate limits and background idle expiry. Real redsun process,
 Tailscale Host preservation, discovery ACL compatibility and browser execution remain
 preflight work; no real service, Tailscale config or live credential was changed.
+
+### Phone-test automation
+
+`apps/companion/script/phone-test.ts` (`bun run phone-test`) automates the host side of
+the phone test; pure helpers live in `phone-test-lib.ts` with unit tests. It is a plain
+Bun child-process script rather than Effect because it only sequences external CLIs and
+relays an interactive stdin. It gates on the MagicDNS name appearing in Tailscale's
+certificate domains, refuses unrelated Serve mappings, asks once, then restarts the local
+source service if it lacks RC, enrolls/imports when `backend.json` is absent (deleting the
+temporary handoff after import), enables policy, runs `check-backend`, applies the
+tailnet-only Serve mapping, and runs `serve --backend` with automatic `enroll`/`pending`
+polling. Fingerprint approval remains a typed human step.
+
+Live host findings on 2026-09-06: two managed services exist, the installed release
+binary (the user's main one) and a source checkout `serve --service` (channel local,
+separate DB). Only the local one is the RC target; it had been started from `dev` before
+the RC commit and must be restarted from the feature branch. The redsun source CLI must
+run with `packages/cli` as working directory. The tailnet had MagicDNS enabled but no
+HTTPS certificates (empty `CertDomains`), which blocks the origin until the user enables
+them in the admin console. No enrollment, policy, Serve or service change was made.
 
 ### Protected local backend import implementation
 
@@ -463,8 +488,9 @@ was reported by the user; phone-to-host connectivity has not been verified.
    HTTP validation/rate limits and CLI/auth route wiring implemented and tested on
    Windows. Policy/event teardown and control authorization are wired and tested with
    synthetic servers. Deployment preflight remains required before private exposure.
-5. Private deployment: stable HTTPS origin, Serve setup, independent background
-   companion lifecycle, real phone test. Pending.
+5. Private deployment: host-side automation exists; blocked on enabling tailnet HTTPS
+   certificates, then the first real phone run. Independent background companion
+   lifecycle remains pending.
 6. Mobile completion: forms/permissions, moves and models/agents are available via
    structured diagnostic controls; polished UI remains deferred. Diagnostic refresh
    and basic retained-ID reconciliation exist, not comprehensive uncertain-write UX.
@@ -552,8 +578,10 @@ in-flight authorization, CSRF/Host validation, request limits, rate limits, leas
 exclusion, and lock release after an actual synthetic companion process is killed.
 Discovery/supervision tests cover protected-file rejection, passive CLI status-only
 requests, heartbeat reporting, fresh-process retry, terminal refusal/identity failures,
-and cancellation of stalled requests on scope release. The full suite now makes 672
-assertions across 21 files on Windows; no additional dependency was installed.
+and cancellation of stalled requests on scope release. Phone-test helper tests cover
+origin/certificate/Serve-state parsing, pending approval lines and option parsing. The
+full suite now makes 697 assertions across 22 files (234 tests) on Windows; no
+additional dependency was installed.
 Redsun verification run separately from its core directory:
 `bun run test ../server/test/remote-control.test.ts ../server/test/remote-admission.test.ts ../server/test/remote-projection.test.ts`
 passed 8 tests / 145 assertions. These use its isolated test harness, not the installed

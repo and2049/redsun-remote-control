@@ -16,14 +16,40 @@ Do not treat passing fixture tests as live deployment certification.
    the commands in the backend attachment guide. No enrollment or enablement was
    performed during companion implementation.
 3. Run `bun run dev check-backend`. This must pass before exposing the companion.
-   On Windows, verify owner-only discovery ACLs. The pinned redsun publisher's
-   `mode: 0600` is not a native Windows ACL guarantee. Do not silently repair files
-   or relax companion checks; resolve an actual incompatibility in redsun if found.
-4. Select the real tailnet HTTPS origin and an unused loopback port. Approve the
-   exact private Serve configuration locally. Never use Funnel or a public listener.
+   Redsun commit `a02bda3a0b` publishes the `.remote` discovery sidecar with a protected
+   owner-only ACL; a service started from an older checkout inherits the state
+   directory's Windows ACL and fails discovery as unavailable. Do not silently repair
+   files or relax companion checks; fix the backend and restart it explicitly.
+4. Select the real tailnet HTTPS origin and an unused loopback port. The tailnet must
+   have HTTPS certificates enabled (Tailscale admin console, DNS page) or the origin
+   cannot exist and passkeys cannot work. Approve the exact private Serve configuration
+   locally. Never use Funnel or a public listener.
 
 The next live integration step still needs these approvals and environment checks.
 No machine-specific settings, handoffs or private hostnames belong in this repository.
+
+## Automated host-side run
+
+```text
+bun run phone-test [--redsun <redsun-checkout>] [--port <loopback-port>]
+```
+
+The script derives the origin from this host's MagicDNS name, refuses to continue
+until that name appears in Tailscale's certificate domains, and refuses any unrelated
+existing Serve mapping. It then prints exactly which host-local changes it will make
+and asks once before proceeding: restart the local source redsun service when the
+running one lacks remote control, enroll and import a handoff when `backend.json` is
+absent (the temporary handoff is deleted after import), enable RC policy when disabled,
+run `check-backend`, add the tailnet-only Serve mapping to the loopback port, and start
+`serve --backend` in the foreground. It never touches the installed release service,
+Funnel, or other Serve mappings.
+
+While the companion runs, the script relays typed local commands to it. On first use it
+sends `enroll` automatically and polls `pending` until the phone's registration appears,
+then prints the exact `approve <requestID> <fingerprint>` line. Compare the complete
+fingerprint with the phone before typing it; the script never approves on its own.
+Typing `enroll` reopens the five-minute window. Ctrl+C stops the companion; remove the
+mapping afterwards with `tailscale serve reset` if nothing else uses Serve.
 
 ## Foreground diagnostic run
 
