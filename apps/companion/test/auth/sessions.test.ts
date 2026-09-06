@@ -6,6 +6,20 @@ test("uses approved session lifetimes", () => {
   expect(sessionPolicy).toEqual({ absoluteLifetimeMs: 86_400_000, idleLifetimeMs: 3_600_000 })
 })
 
+test("background authorization checks never extend idle expiry", () => {
+  let now = 0
+  const sessions = new Sessions(1, { absoluteLifetimeMs: 100, idleLifetimeMs: 40 }, () => now)
+  try {
+    const token = sessions.issue()
+    const signal = sessions.authenticate(token, false)
+    now = 39
+    expect(sessions.authenticate(token, false)).toBe(signal)
+    now = 40
+    expect(sessions.authenticate(token, false)).toBeUndefined()
+    expect(signal?.aborted).toBe(true)
+  } finally { sessions.close() }
+})
+
 test("issues independent opaque tokens and rejects unknown or malformed tokens", () => {
   const sessions = new Sessions(2)
   try {

@@ -3,11 +3,11 @@
 A private, browser-based remote interface for an existing background redsun server,
 using Tailscale for connectivity. Initially: one host and one remote controller.
 
-**Backend in progress:** local approval, passkey authentication HTTP endpoints,
-session cookies, credential persistence and browser recovery are implemented. There
-is no web interface, operational redsun connection, or remote control yet.
-Do not expose this development listener through Tailscale Serve,
-Funnel, a LAN binding, or a public proxy.
+**Diagnostic vertical slice implemented:** passkey authentication, supervised backend
+attachment, allowlisted remote operations and a dependency-free phone diagnostic page
+are available in explicit `serve --backend` mode. Real-redsun, browser and Tailscale
+integration remain unverified. Complete the [phone-test preflight](docs/phone-test.md)
+before private exposure. Never use Funnel, a LAN binding or a public proxy.
 
 ## Development
 
@@ -49,10 +49,10 @@ verification run before deployment.
   Its `src/auth` modules implement passkey verification, single-use challenges, and
   scoped session lifetimes, local enrollment approval, and authenticated HTTP routes.
   Its `src/backend` modules validate the pinned redsun RC contract and provide scoped
-  status/heartbeat attachment. Its `src/storage` modules provide protected backend
+   status/heartbeat attachment. Its `src/storage` modules provide protected backend
   handoff import, serialized credential counter updates, and local browser recovery.
-  Automatic reconnection is not implemented; no backend credentials
-  are loaded by the development command.
+  Explicit `serve --backend` adds scoped events, passive reconnection, remote operations
+  and diagnostic assets. No credentials are loaded by no-argument development mode.
 - `apps/web`: reserved browser application boundary, pending upstream UI audit.
 - `packages/protocol`: browser-safe companion contracts.
 - `.redsun/memory.md`: live progress, architecture decisions, and open questions.

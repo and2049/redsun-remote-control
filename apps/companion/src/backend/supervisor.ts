@@ -1,4 +1,4 @@
-import { Effect, type Redacted } from "effect"
+import { Deferred, Effect, type Redacted } from "effect"
 import { attach } from "./attachment"
 import { BackendError, type Handoff, type Registration } from "./contract"
 import { discover } from "./discovery"
@@ -14,6 +14,7 @@ export type SupervisorOptions = {
   readonly retryMs: number
   readonly connected: () => boolean
   readonly invalidate: Effect.Effect<void>
+  readonly onSync?: () => void
 }
 
 export function supervise(
@@ -33,24 +34,32 @@ export function supervise(
     })
     let snapshot: BackendSnapshot = { state: "connecting" }
     let active: AbortController | undefined
+    let current: Effect.Success<ReturnType<typeof attach>> | undefined
     const invalidate = Effect.gen(function* () {
       active?.abort()
       active = undefined
+      current = undefined
       yield* options.invalidate
     })
     const attempt = Effect.scoped(Effect.gen(function* () {
       const registration = yield* discovery
       const connection = yield* attach(enrollment, registration, { timeoutMs: options.timeoutMs })
       const heartbeat = Effect.suspend(() => connection.heartbeat(options.connected()))
-      yield* heartbeat
-      active = new AbortController()
-      snapshot = {
-        state: "ready", backendID: connection.backendID, processID: connection.processID, signal: active.signal,
-      }
-      while (true) {
-        yield* Effect.sleep(options.heartbeatMs)
+      const subscribed = yield* Deferred.make<void>()
+      const report = Effect.gen(function* () {
+        if (options.onSync) yield* Deferred.await(subscribed).pipe(Effect.timeout(options.timeoutMs), Effect.mapError(() => new BackendError("unavailable")))
         yield* heartbeat
-      }
+        active = new AbortController()
+        current = connection
+        snapshot = { state: "ready", backendID: connection.backendID, processID: connection.processID, signal: active.signal }
+        options.onSync?.()
+        while (true) { yield* Effect.sleep(options.heartbeatMs); yield* heartbeat }
+      })
+      if (!options.onSync) return yield* report
+      yield* Effect.all([report, connection.watch(() => {
+        Effect.runSync(Deferred.succeed(subscribed, undefined))
+        options.onSync?.()
+      })], { concurrency: "unbounded" })
     }))
     const loop = Effect.gen(function* () {
       while (true) {
@@ -71,6 +80,17 @@ export function supervise(
       if (snapshot.state !== "stopped") snapshot = { state: "closed" }
       yield* invalidate
     })), Effect.forkScoped)
-    return { snapshot: (): BackendSnapshot => ({ ...snapshot }) }
+    return {
+      snapshot: (): BackendSnapshot => ({ ...snapshot }),
+      request: (input: unknown, signal: AbortSignal, responseLimit: number) => Effect.suspend(() => {
+        if (snapshot.state !== "ready" || !current || snapshot.signal.aborted) return Effect.fail(new BackendError("unavailable"))
+        return current.request(input, AbortSignal.any([signal, snapshot.signal]), responseLimit).pipe(
+          Effect.tapError((error) => error instanceof BackendError && !signal.aborted ? Effect.gen(function* () {
+            snapshot = { state: "unavailable" }
+            yield* invalidate
+          }) : Effect.void),
+        )
+      }),
+    }
   })
 }

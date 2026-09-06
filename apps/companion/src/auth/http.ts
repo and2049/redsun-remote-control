@@ -33,23 +33,23 @@ const Login = Schema.Struct({
     }),
   }),
 })
-function emptyBody(value: unknown): void {
+export function emptyBody(value: unknown): void {
   if (value === null || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length !== 0) throw new HttpError(400)
 }
 const bindingName = "__Host-redsun-binding"
 const sessionName = "__Host-redsun-session"
-const headers = {
+export const headers = {
   "Cache-Control": "no-store",
   "X-Content-Type-Options": "nosniff",
   "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
   "Referrer-Policy": "no-referrer",
 }
 
-class HttpError extends Error {
+export class HttpError extends Error {
   constructor(readonly status: number) { super("Request rejected") }
 }
 
-function cookie(request: Request, name: string): string {
+export function cookie(request: Request, name: string): string {
   const values = (request.headers.get("cookie") ?? "").split(";").map((part) => part.trim()).filter((part) => part.startsWith(`${name}=`))
   if (values.length > 1) throw new HttpError(400)
   const value = values[0]?.slice(name.length + 1) ?? ""
@@ -61,11 +61,11 @@ function setCookie(name: string, token: string, lifetime: number): string {
   return `${name}=${token}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${lifetime}`
 }
 
-async function json(request: Request): Promise<unknown> {
+export async function json(request: Request, limit = 65536): Promise<unknown> {
   if (request.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() !== "application/json") throw new HttpError(415)
   if (request.headers.has("content-encoding")) throw new HttpError(415)
   const length = request.headers.get("content-length")
-  if (length !== null && (!/^\d+$/.test(length) || Number(length) > 65536)) throw new HttpError(413)
+  if (length !== null && (!/^\d+$/.test(length) || Number(length) > limit)) throw new HttpError(413)
   if (!request.body) throw new HttpError(400)
   const reader = request.body.getReader()
   const chunks: Uint8Array[] = []
@@ -76,7 +76,7 @@ async function json(request: Request): Promise<unknown> {
       const chunk = await reader.read()
       if (chunk.done) break
       size += chunk.value.length
-      if (size > 65536) throw new HttpError(413)
+      if (size > limit) throw new HttpError(413)
       chunks.push(chunk.value)
     }
     try {
@@ -92,6 +92,14 @@ async function json(request: Request): Promise<unknown> {
     clearTimeout(timer)
     void reader.cancel().catch(() => {})
   }
+}
+
+export function sameOrigin(request: Request, origin: string): void {
+  const target = new URL(request.url)
+  const host = new URL(origin).host
+  if (target.host !== host || (request.headers.has("host") && request.headers.get("host") !== host) || request.headers.get("origin") !== origin || target.search ||
+    (request.headers.has("sec-fetch-site") && request.headers.get("sec-fetch-site") !== "same-origin")) throw new HttpError(403)
+  if ((request.headers.get("cookie")?.length ?? 0) > 8192) throw new HttpError(431)
 }
 
 function decode<S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): S["Type"] {

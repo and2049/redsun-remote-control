@@ -1,6 +1,8 @@
 import { Effect, Redacted } from "effect"
 import { BackendError, decodeRegistration, decodeStatus, type Handoff } from "./contract"
 import { loopbackEndpoint, statusRequest } from "./transport"
+import { remoteRequest } from "./request"
+import { watchEvents } from "./events"
 
 export function attach(
   enrollment: Redacted.Redacted<Handoff>,
@@ -25,10 +27,12 @@ export function attach(
       catch: (error) => error instanceof BackendError ? error : new BackendError("invalid-contract"),
     })
     let closed = false
+    const lifetime = new AbortController()
     const controllers = new Set<AbortController>()
 
     const close = Effect.sync(() => {
       closed = true
+      lifetime.abort()
       for (const controller of controllers) controller.abort()
       controllers.clear()
     })
@@ -69,6 +73,17 @@ export function attach(
       initialStatus: status,
       status: () => check(),
       heartbeat: (connected: boolean) => check(connected),
+      request: (input: unknown, signal: AbortSignal, responseLimit: number) => Effect.suspend(() => {
+        if (closed) return Effect.fail(new BackendError("closed"))
+        return remoteRequest(context.endpoint, context.authorization, input, AbortSignal.any([lifetime.signal, signal]), options.timeoutMs, responseLimit).pipe(
+          Effect.tapError((error) => error instanceof BackendError && !signal.aborted ? close : Effect.void),
+        )
+      }),
+      watch: (onSync: () => void) => watchEvents(context.endpoint, context.authorization, lifetime.signal, options.timeoutMs, (status) => {
+        if (status && (status.backendID !== context.backendID || status.processID !== context.registration.id)) throw new BackendError("identity-mismatch")
+        if (status && (!status.supported || !status.enabled || !status.enrolled || status.state === "disabled")) throw new BackendError("refused")
+        onSync()
+      }).pipe(Effect.tapError(() => close)),
       close,
     }
   })

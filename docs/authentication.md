@@ -1,8 +1,9 @@
 # Companion authentication backend
 
-The authentication flow is implemented without frontend pages. Backend session/prompt
-routes and Tailscale deployment remain unavailable. Do not expose the listener yet:
-backend policy supervision and route/event authorization are still pending.
+Authentication-only mode has no frontend pages. The explicit `--backend` extension
+adds a diagnostic page, authorized remote operations and policy supervision. See
+[phone-test preflight](phone-test.md) before exposure; real-redsun and phone deployment
+have not yet been verified.
 
 ## Local operation
 

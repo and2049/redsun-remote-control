@@ -1,13 +1,16 @@
 import { expect, test } from "bun:test"
 import { spawn } from "node:child_process"
+import { createServer, type ServerResponse } from "node:http"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { Schema } from "effect"
+import { Effect, Schema } from "effect"
 import { authenticator } from "./auth/authenticator"
+import { createPrivateFile, ensurePrivateDirectory } from "../src/storage/private-file"
+import { handoff, status } from "./backend/fixture"
 
-test("authenticated CLI accepts local approval/recovery and releases its writer lease after process death", async () => {
+test.each([false, true])("CLI authentication, recovery and optional operational mode (backend=%s)", async (remote) => {
   const root = await mkdtemp(path.join(tmpdir(), process.platform === "win32" ? "redsun/cli-auth-" : "redsun-cli-auth-"))
   const reserve = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response() })
   const port = reserve.port
@@ -15,7 +18,32 @@ test("authenticated CLI accepts local approval/recovery and releases its writer 
   const origin = "https://host.example.ts.net"
   const cli = fileURLToPath(new URL("../src/cli.ts", import.meta.url))
   const env = { ...process.env, LOCALAPPDATA: root, XDG_DATA_HOME: root }
-  const child = spawn(process.execPath, ["run", cli, "serve", "--origin", origin, "--port", String(port)], { env, stdio: ["pipe", "pipe", "pipe"] })
+  const streams = new Set<ServerResponse>()
+  let enabled = true
+  const backend = createServer((request, response) => {
+    expect(request.headers.authorization).toBe(`Bearer rc1.${handoff.credentialID}.${handoff.token}`)
+    if (!enabled) { response.writeHead(401); response.end(); return }
+    if (request.url === "/api/event") {
+      streams.add(response)
+      response.on("close", () => streams.delete(response))
+      response.writeHead(200, { "Content-Type": "text/event-stream" })
+      response.write(`data: ${JSON.stringify({ id: "evt_fixture", type: "server.connected", data: {} })}\n\n`)
+      return
+    }
+    response.writeHead(200, { "Content-Type": "application/json" })
+    response.end(JSON.stringify(request.url?.startsWith("/api/remote") ? status : { data: [] }))
+  })
+  await new Promise<void>((resolve) => backend.listen(0, "127.0.0.1", resolve))
+  if (remote) {
+    const address = backend.address()
+    if (!address || typeof address === "string") throw new Error("Invalid backend fixture")
+    const directory = path.join(root, "redsun-remote-control")
+    const registration = path.join(directory, "fixture.remote")
+    await Effect.runPromise(ensurePrivateDirectory(directory))
+    await Effect.runPromise(createPrivateFile(registration, Buffer.from(JSON.stringify({ id: status.processID, pid: process.pid, version: "fixture", url: `http://127.0.0.1:${address.port}` }))))
+    await Effect.runPromise(createPrivateFile(path.join(directory, "backend.json"), Buffer.from(JSON.stringify({ ...handoff, registration }))))
+  }
+  const child = spawn(process.execPath, ["run", cli, "serve", "--origin", origin, "--port", String(port), ...(remote ? ["--backend"] : [])], { env, stdio: ["pipe", "pipe", "pipe"] })
   let output = ""
   const ended = new Promise<void>((resolve) => child.once("close", () => resolve()))
   child.stdout.on("data", (chunk: Buffer) => { output += chunk.toString() })
@@ -58,6 +86,23 @@ test("authenticated CLI accepts local approval/recovery and releases its writer 
     expect(loggedIn.status).toBe(200)
     const cookie = loggedIn.headers.get("set-cookie")?.split(";")[0] ?? ""
     expect((await post("/auth/session", cookie)).status).toBe(200)
+    if (remote) {
+      const page = await fetch(`http://127.0.0.1:${port}/`, { headers: { Host: new URL(origin).host } })
+      expect(page.status).toBe(200)
+      expect(await page.text()).toContain("Redsun phone diagnostic")
+      expect(page.headers.get("content-security-policy")).toContain("frame-ancestors 'none'")
+      expect((await post("/control/request", "", { method: "GET", path: "/api/session" })).status).toBe(401)
+      expect((await post("/control/request", cookie, { method: "GET", path: "/api/config" })).status).toBe(400)
+      expect(await (await post("/control/request", cookie, { method: "GET", path: "/api/session" })).json()).toEqual({ data: [] })
+      const events = await post("/control/events", cookie)
+      expect(events.status).toBe(200)
+      const reader = events.body!.getReader()
+      expect(new TextDecoder().decode((await reader.read()).value)).toContain(handoff.backendID)
+      enabled = false
+      for (const stream of streams) stream.write(`data: ${JSON.stringify({ id: "evt_disabled", type: "remote.status", data: { ...status, enabled: false, state: "disabled" } })}\n\n`)
+      expect((await reader.read()).done).toBe(true)
+      expect((await post("/auth/session", cookie)).status).toBe(401)
+    }
     expect((await offline()).code).toBe(1)
     child.stdin.write("recover confirm\n")
     await wait("sessions revoked")
@@ -69,6 +114,9 @@ test("authenticated CLI accepts local approval/recovery and releases its writer 
   } finally {
     child.kill("SIGKILL")
     await ended
+    for (const stream of streams) stream.end()
+    backend.closeAllConnections()
+    await new Promise<void>((resolve) => backend.close(() => resolve()))
     await rm(root, { recursive: true, force: true })
   }
 }, 30000)

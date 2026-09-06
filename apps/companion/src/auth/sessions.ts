@@ -54,7 +54,7 @@ export class Sessions {
     return token
   }
 
-  authenticate(token: string): AbortSignal | undefined {
+  authenticate(token: string, activity = true): AbortSignal | undefined {
     if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return undefined
     const key = this.key(token)
     const entry = this.entries.get(key)
@@ -64,8 +64,10 @@ export class Sessions {
       this.remove(key, entry)
       return undefined
     }
-    entry.idleExpiresAt = now + this.policy.idleLifetimeMs
-    this.schedule(key, entry)
+    if (activity) {
+      entry.idleExpiresAt = now + this.policy.idleLifetimeMs
+      this.schedule(key, entry)
+    }
     return entry.controller.signal
   }
 

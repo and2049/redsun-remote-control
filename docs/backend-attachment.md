@@ -39,8 +39,8 @@ do not weaken validation or change runtime permissions silently to make a check 
 
 ## Supervisor core
 
-`apps/companion/src/backend/supervisor.ts` is an Effect-scoped core, not yet mounted
-in the authenticated serve command. Its inputs explicitly specify request timeout,
+`apps/companion/src/backend/supervisor.ts` is an Effect-scoped core mounted by explicit
+`serve --backend` mode. Its inputs explicitly specify request timeout,
 heartbeat interval, retry delay, a trusted browser-connection predicate and an
 idempotent invalidation effect. Heartbeat interval plus timeout must be below the
 backend's thirty-second lease; approximately ten-second heartbeats are the contract's
@@ -60,22 +60,16 @@ than once and must be idempotent. These signals are intended for browser resourc
 never for interrupting admitted agent execution. Readiness exposes only state, stable
 backend ID, process ID and that signal; no credential or network endpoint.
 
-Heartbeat polling is not immediate policy notification. Scoped SSE closure/status
-hints, browser session invalidation, request authorization, subscribe-before-snapshot
-synchronization and actual session/prompt adapters still need operational wiring.
-No browser connection count is inferred from a cookie or kept alive by background
-stream traffic in this core.
+Heartbeat polling is supplemented by scoped SSE closure/status hints in operational
+mode. Browser session invalidation, request authorization and subscribe-before-snapshot
+refresh are wired there. Browser connection reporting counts authenticated control
+streams, not merely cookies. Background traffic does not extend login idle lifetime.
 
 ## Path to a phone test
 
-Before exposing the companion through private Tailscale Serve:
-
-1. Wire supervised attachment to browser authorization and policy teardown.
-2. Add the restricted session/prompt operations and scoped event synchronization.
-3. Add a minimal diagnostic browser page for passkey enrollment/login and smoke
-   testing, separate from the deferred product UI.
-4. Verify attachment against an isolated real redsun process, then explicitly approve
-   the live service enrollment/enablement, HTTPS origin, port and Serve configuration.
-
-Plain `bun dev` remains the loopback health-only development listener. No phone-ready
-mode, automatic service setup or Tailscale exposure is implemented by this increment.
+The companion-side diagnostic slice is implemented. Before exposure, real-redsun
+integration and Windows discovery permissions still need verification, followed by
+explicit approval of live enrollment/enablement, HTTPS origin, port and Serve mapping.
+See [phone-test preflight](phone-test.md) for the exact mode, API limits and remaining
+verification. Plain `bun dev` remains health-only; no automatic service setup or
+Tailscale change is performed.

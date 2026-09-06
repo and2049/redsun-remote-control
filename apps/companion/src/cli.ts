@@ -9,6 +9,7 @@ import { makeAuthenticationHttp } from "./auth/http"
 import { handleRequest } from "./http"
 import { localCommand } from "./local"
 import { probeBackend } from "./backend/probe"
+import { operational } from "./operational"
 
 const controller = new AbortController()
 const stop = () => controller.abort()
@@ -21,6 +22,7 @@ const program = Effect.scoped(
     if (command.kind === "help") {
       console.log("Usage: companion [--help | import-backend <absolute-private-handoff-file>]")
       console.log("Authenticated mode: companion serve --origin <https-origin> --port <loopback-port>")
+      console.log("Phone diagnostic and scoped backend routes: append --backend (requires an imported handoff)")
       console.log("Offline browser recovery: companion recover --confirm (refused while a companion owns the store)")
       console.log("Passive backend check: companion check-backend (protected discovery and scoped status only)")
       console.log("No arguments: development health listener. Import preserves the source and never enables or starts redsun.")
@@ -42,8 +44,14 @@ const program = Effect.scoped(
       const directory = yield* Effect.try(() => dataDirectory())
       const auth = yield* makeAuthentication(directory, command.origin)
       const http = yield* makeAuthenticationHttp(auth, command.origin)
-      yield* serve(command.port, (request) => new URL(request.url).pathname === "/health" ? handleRequest(request) : http.handle(request))
-      console.log("Authentication listener ready on the configured loopback port. Backend routes and Tailscale setup remain unavailable.")
+      const remote = command.backend ? yield* operational(directory, command.origin, auth) : undefined
+      yield* serve(command.port, (request) => {
+        const pathname = new URL(request.url).pathname
+        if (pathname === "/health") return handleRequest(request)
+        if (pathname.startsWith("/auth/") || !remote) return http.handle(request)
+        return remote(request)
+      }, command.backend ? 6 * 1024 * 1024 : 65536)
+      console.log(command.backend ? "Diagnostic listener ready on loopback. Backend readiness requires valid discovery, scoped SSE and heartbeat. No Tailscale setup was performed." : "Authentication listener ready on the configured loopback port. Backend routes and Tailscale setup remain unavailable.")
       console.log("Local commands: enroll | pending | approve <requestID> <fingerprint> | cancel | recover confirm")
       const input = yield* Effect.acquireRelease(
         Effect.sync(() => createInterface({ input: process.stdin, crlfDelay: Infinity, terminal: false })),

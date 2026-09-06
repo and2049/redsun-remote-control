@@ -34,9 +34,10 @@ with no commit-body description. Do not include unrelated user work.
 - Scope release stops the listener. CLI interruption aborts the scope.
 - Passkey verification, session cookies, local approval/recovery CLI controls,
   protected credential/counter storage, and authentication HTTP wiring exist.
-  Backend attachment includes protected discovery, a passive CLI probe and a scoped
-  supervisor core, not yet mounted in serve mode; no operational
-  redsun connection, remote session/prompt routes, UI, or Tailscale configuration exists.
+  Explicit `serve --backend` now mounts protected backend loading, scoped supervision,
+  allowlisted operations, browser refresh streams and a dependency-free diagnostic
+  page. Real-redsun, browser and Tailscale deployment are not yet verified; the product
+  UI remains deferred. No Tailscale configuration was changed.
 
 Approved dependencies: Effect, TypeScript, Bun types. Initial exact pins match the
 locally inspected redsun toolchain: Effect 4.0.0-rc.112, TypeScript 5.8.2, Bun types
@@ -75,8 +76,8 @@ and do not retain potentially sensitive library messages.
 
 `invalidate` clears outstanding challenges and changes a generation counter so
 in-flight option generation/verification cannot succeed after invalidation. It is
-wired to local recovery and the auth service's disable hook. Redsun backend policy
-events are not connected yet.
+wired to local recovery and auth revocation hooks. Operational backend loss and policy
+events now invalidate browser authorization through supervision.
 
 ### Authentication invariants and exposure responsibilities
 
@@ -99,8 +100,9 @@ events are not connected yet.
 
 Authentication HTTP/CLI wiring is implemented in the explicit serve mode described
 below; no-argument mode remains health-only. Legacy `/auth/register` and `/auth/login`
-paths stay unavailable. No backend proxy routes exist. Do not expose through
-Tailscale before backend policy supervision and route/event authorization are complete.
+paths stay unavailable. `serve --backend` separately mounts the allowlisted control
+surface described below. Before Tailscale exposure, complete real-redsun and permission
+preflight and obtain explicit local deployment authorization.
 
 ### Browser session lifetime core
 
@@ -115,8 +117,8 @@ factory closes the store on scope release, aborting signals and cancelling timer
 a closed store cannot issue new sessions. No sessions persist across restart.
 
 `auth/service.ts` wires this to cookies/login through `auth/http.ts`, durable counter
-updates, local recovery and a disable hook. Actual backend disable events/streams
-remain unwired. Signals are for browser resources, never backend agent execution.
+updates, local recovery and revocation hooks. Operational backend failures/events now
+revoke browser sessions and streams. Signals are for browser resources, never agent execution.
 Stream keepalives must not call authenticate merely to extend idle lifetime.
 
 ### Local enrollment coordinator and initial owner persistence
@@ -176,7 +178,8 @@ counter persistence and generation/lease rechecks. Recovery invalidates sessions
 pending login generations before waiting for owner deletion, preventing in-flight
 login from issuing a session after revocation begins. Storage errors and lease loss
 fail closed. The disable hook clears authorization and remains disabled even after
-local recovery; it is not connected to redsun policy events yet.
+local recovery. Operational supervision uses the separate nonpermanent `revoke` hook
+to clear sessions/ceremonies on backend loss; stopped supervisors still deny operations.
 
 `auth/http.ts` mounts POST-only `/auth/binding`, `/auth/register/options`,
 `/auth/register/verify`, `/auth/login/options`, `/auth/login/verify`, `/auth/session`
@@ -205,7 +208,8 @@ Origin changes require recovery and re-enrollment. Configuration is supplied thr
 explicit CLI arguments; no operational configuration-file loader exists yet.
 
 `docs/authentication.md` defines these commands, routes, limits and failure semantics.
-No frontend pages, operational redsun attachment, or real Tailscale/browser test exists.
+The optional `--backend` extension adds operational attachment and a diagnostic page.
+No real Tailscale/browser test has run.
 
 ## Architecture direction
 
@@ -255,8 +259,8 @@ upstream API surface.
   no unrestricted password. It can be stale. `/api/remote` must report supported,
   enabled, enrolled, version 1, matching durable backendID and registration processID.
 - Lease is 30 seconds; the supervisor's caller should heartbeat roughly every 10 seconds.
-  `connected:false` means companion-ready, not an authenticated browser. Browser
-  connection reporting is not implemented here yet.
+  `connected:false` means companion-ready, not an authenticated browser. Operational
+  connection reporting now counts authenticated browser control streams.
 - **Scoped SSE is hints only**: server.connected, remote.status, remote.sync. No raw
   token deltas. Subscribe then resnapshot, coalesce hints, and periodically refresh.
   The ordinary redsun Solid event reducer cannot consume this as its normal feed.
@@ -281,8 +285,8 @@ object in an Effect scope, verifies `/api/remote`, and returns status/heartbeat 
 Every result is checked against both identities and current enabled/supported state.
 Any failure closes the handle; a supervisor must rediscover and attach again explicitly.
 Scope exit or close aborts pending requests. The supervisor/discovery cores described
-below wrap attachment with passive retry and heartbeat scheduling. Session methods
-and event streams remain unimplemented.
+below wrap attachment with passive retry and heartbeat scheduling. The attachment now
+also owns allowlisted requests and scoped event subscriptions, cancelled on close.
 
 `backend/transport.ts` is intentionally limited to status and heartbeat, not a generic
 proxy. Uses Node HTTP directly so environment HTTP/HTTPS/ALL_PROXY settings cannot
@@ -323,8 +327,9 @@ credentials or endpoints. Failure aborts the generation and runs invalidation be
 retry; scope release cancels pending HTTP and stops heartbeats. Callbacks must be
 idempotent. These are browser-resource signals, never agent interruption. Tests cover
 fresh-process rediscovery, refusal/identity failure, timing validation and shutdown
-during a stalled heartbeat. The supervisor is not yet wired to serve/authentication;
-SSE-driven policy teardown and authorized session/prompt operations remain pending.
+during a stalled heartbeat. In operational mode it also waits for the first validated
+scoped event before publishing ready, and monitors SSE alongside heartbeats. SSE
+closure, invalid status/identity and authorization refusal invalidate browser access.
 
 CLI `check-backend` loads protected enrollment/discovery and makes one scoped status
 request with a five-second network deadline. It prints fixed success/failure text,
@@ -337,7 +342,60 @@ Windows live-integration risk: the pinned redsun discovery publisher uses filesy
 on inherited Windows ACLs and remains unverified. Do not weaken companion validation
 or silently repair runtime files. No live discovery/credential file was inspected.
 
-### Protected local backend import
+### Operational control and phone diagnostic
+
+Operational control details are documented in `docs/phone-test.md`. `operational.ts`
+loads protected enrollment and configures a five-second network deadline, ten-second
+heartbeat and three-second passive retry. Its supervisor invalidation effect clears
+browser sessions and pending ceremonies, but never sends an agent interrupt.
+
+`backend/operations.ts` validates a finite route/method/query-key/payload allowlist
+for the pinned v1 capability table: sessions/history/inbox/active, prompts, interrupt,
+moves, location resolution, model/agent selection/catalogs, permissions and supported
+forms. Administrative methods, backend URLs, status/heartbeat/event proxying, unknown
+fields and file/HTTP attachments are refused. Canonical query/domain validation and
+ownership remain redsun's responsibility. `backend/request.ts` uses direct Node HTTP,
+refuses redirects, bounds request/response bytes and time, never retries mutations and
+never forwards backend error bodies/headers. Successful JSON relies on the pinned
+scoped response projections, not a vendored full response schema or content DLP.
+
+`backend/events.ts` incrementally bounds/parses only pinned scoped SSE data/comment
+frames and validates status events. Backend events are not forwarded to browsers.
+`control.ts` provides POST-only `/control/request` and `/control/events`, authenticated
+with exact Origin/Host and existing secure cookies. Browser refresh frames contain
+only backendID/revision, coalesced at 250 ms with a five-second periodic backstop.
+Backpressure, session expiry/logout/recovery and backend-generation loss close streams.
+Heartbeat connected reporting counts active authenticated streams, never mere cookies.
+Background stream/snapshot authorization does not extend idle expiry; the diagnostic
+marks background reads with `X-Redsun-Activity: background`, which only suppresses idle
+extension and cannot grant authority. Ordinary user activity retains existing expiry rules.
+
+The user explicitly approved phone-test limits: 6 MiB request bodies, four prompt files,
+16 MiB backend JSON responses, eight concurrent requests including streams, and a shared
+authenticated burst 60/refill two-per-second bucket. Auth endpoints retain their separate
+limits. Oversized history needs smaller pages. Caller cancellation does not invalidate
+an otherwise healthy backend attachment; no cancellation undoes admitted agent work.
+
+The user approved a dependency-free diagnostic page, separate from the deferred product
+UI. `diagnostic.ts` builds its browser TypeScript with Bun at startup and serves only
+fixed assets under restrictive CSP/Host checks. The page uses native WebAuthn JSON helpers,
+text-only output rendering, explicit reconnect and subscribe-before-snapshot refresh.
+It has list/create/prompt/history/inbox/interrupt controls plus structured allowlisted
+operations for forms/permissions/moves/catalogs. Modern browser support is required and
+has not been hardware-tested. Uncertain prompt IDs/text are retained in tab sessionStorage,
+scoped by backend and session; reconciliation checks loaded history/inbox pages without
+resending. Uncertain creates retain their session ID. Raw controls and additional history
+pages require manual reconciliation; no polished uncertain-write UX is claimed.
+
+Operational CLI subprocess tests use real signed passkey fixtures and a synthetic
+HTTP/SSE backend. They verify authorized reads, denied administrative/unauthenticated
+access, diagnostic assets and backend disable revoking cookies/streams. Additional tests
+cover payload allowlisting, malformed events, bounded/redirect-free transport, mutation
+nonretry, concurrency/rate limits and background idle expiry. Real redsun process,
+Tailscale Host preservation, discovery ACL compatibility and browser execution remain
+preflight work; no real service, Tailscale config or live credential was changed.
+
+### Protected local backend import implementation
 
 `storage/private-file.ts` and its Windows PowerShell helper implement bounded
 16-KiB reads and no-overwrite file publication. Windows uses native .NET owner-only
@@ -370,7 +428,7 @@ Windows permission and CLI behavior is tested with disposable synthetic fixtures
 outside the repository. Linux implementation is typechecked but has not run on Linux;
 do not describe cross-platform deployment as verified. Owner creation, atomic counter
 updates and recovery exist; protected discovery and explicit CLI probe loading now
-exist. Operational serve-mode backend loading remains pending.
+exist. Operational serve-mode backend loading now exists behind explicit `--backend`.
 
 ### Earlier discovery audit
 
@@ -398,18 +456,18 @@ was reported by the user; phone-to-host connectivity has not been verified.
    including a real loopback listener and scope-release check.
 2. Integration audit: finalized v1 backend contract reviewed and pinned; narrow adapter
    chosen. Focused redsun RC tests pass. Frontend/UI audit remains explicitly deferred.
-3. Local vertical slice: scoped status/heartbeat attachment, protected backend import
-   and discovery, passive CLI probe and supervisor core implemented and fixture-tested
-   on Windows. Serve integration, sessions/prompts, scoped SSE and interruption remain
-   pending. No remote exposure before authorization and policy teardown.
+3. Local vertical slice: protected attachment, operational supervision, scoped events,
+   allowlisted operations and diagnostic browser assets implemented and fixture-tested
+   on Windows. Real-redsun process integration and browser execution remain unverified.
 4. Security: passkeys, local approval, protected counters, browser sessions, recovery,
    HTTP validation/rate limits and CLI/auth route wiring implemented and tested on
-   Windows. Backend policy/event revocation wiring and session/prompt authorization
-   remain pending; the complete backend is not yet ready for private deployment.
+   Windows. Policy/event teardown and control authorization are wired and tested with
+   synthetic servers. Deployment preflight remains required before private exposure.
 5. Private deployment: stable HTTPS origin, Serve setup, independent background
    companion lifecycle, real phone test. Pending.
-6. Mobile completion: forms/permissions, directory changes, models/agents, reconnect,
-   uncertain writes and approval races. Pending.
+6. Mobile completion: forms/permissions, moves and models/agents are available via
+   structured diagnostic controls; polished UI remains deferred. Diagnostic refresh
+   and basic retained-ID reconciliation exist, not comprehensive uncertain-write UX.
 
 ## Approved backend completion policies
 
@@ -475,7 +533,7 @@ now exposes the tested authentication surface, still without Tailscale deploymen
 
 Run from repository root: `bun install --frozen-lockfile`, `bun run typecheck`,
 `bun test`. Development: `bun run dev` (ephemeral loopback health listener only).
-Current verification: frozen install and typecheck pass; 181 tests, 0 failures,
+Current verification: frozen install and typecheck pass; 228 tests, 0 failures,
 including real WebAuthn registration and signed authentication for three algorithms,
 negative security cases, concurrency, invalidation, listener cleanup, and scoped
 attachment fixtures (redirect refusal, proxy isolation, identity/restart checks,
@@ -494,8 +552,8 @@ in-flight authorization, CSRF/Host validation, request limits, rate limits, leas
 exclusion, and lock release after an actual synthetic companion process is killed.
 Discovery/supervision tests cover protected-file rejection, passive CLI status-only
 requests, heartbeat reporting, fresh-process retry, terminal refusal/identity failures,
-and cancellation of stalled requests on scope release. All 181 tests make 501 assertions
-across 17 files on Windows; no additional dependency was installed.
+and cancellation of stalled requests on scope release. The full suite now makes 672
+assertions across 21 files on Windows; no additional dependency was installed.
 Redsun verification run separately from its core directory:
 `bun run test ../server/test/remote-control.test.ts ../server/test/remote-admission.test.ts ../server/test/remote-projection.test.ts`
 passed 8 tests / 145 assertions. These use its isolated test harness, not the installed

@@ -98,15 +98,16 @@ export function makeAuthentication(directory: string, origin: string) {
         if (version !== generation) return yield* Effect.fail(new AuthenticationError())
         return yield* Effect.try({ try: () => sessions.issue(), catch: () => new AuthenticationError() })
       })),
-      session: (token: string) => check.pipe(Effect.andThen(Effect.try({
+      session: (token: string, activity = true) => check.pipe(Effect.andThen(Effect.try({
         try: () => {
-          const signal = sessions.authenticate(token)
+          const signal = sessions.authenticate(token, activity)
           if (!signal) throw new AuthenticationError()
           return signal
         },
         catch: () => new AuthenticationError(),
       }))),
       logout: (token: string) => Effect.sync(() => sessions.revoke(token)),
+      revoke: safe(invalidate.pipe(Effect.andThen(enrollment.cancel))),
       disable: safe(Effect.gen(function* () {
         disabled = true
         yield* failClosed
