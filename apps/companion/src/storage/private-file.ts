@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process"
 import { constants } from "node:fs"
-import { link, lstat, mkdir, open, unlink } from "node:fs/promises"
+import { link, lstat, mkdir, open, rename, unlink } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -107,13 +107,14 @@ export function readPrivateFile(file: string) {
   })
 }
 
-export function createPrivateFile(file: string, content: Uint8Array) {
+function writePrivateFile(file: string, content: Uint8Array, replace: boolean) {
   const bytes = Buffer.from(content)
   return Effect.tryPromise({
     try: async () => {
       if (bytes.length > limit) throw new StorageError()
       await localPath(file)
-      if (process.platform === "win32") { await windows("create", file, bytes.toString("base64")); return }
+      if (replace) await Effect.runPromise(readPrivateFile(file))
+      if (process.platform === "win32") { await windows(replace ? "replace" : "create", file, bytes.toString("base64")); return }
       const parent = path.dirname(file)
       await privateDirectory(parent)
       const temporary = path.join(parent, `${randomUUID()}.tmp`)
@@ -122,11 +123,51 @@ export function createPrivateFile(file: string, content: Uint8Array) {
         await handle.writeFile(bytes)
         await handle.sync()
         await handle.close()
-        await link(temporary, file)
-      } finally { await handle.close(); await unlink(temporary) }
+        if (replace) await rename(temporary, file)
+        else await link(temporary, file)
+      } finally {
+        await handle.close()
+        await unlink(temporary).catch((error: unknown) => {
+          if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error
+        })
+      }
       const directory = await open(parent, constants.O_RDONLY | constants.O_DIRECTORY)
       try { await directory.sync() } finally { await directory.close() }
     },
     catch: () => new StorageError(),
+  }).pipe(Effect.uninterruptible)
+}
+
+export const createPrivateFile = (file: string, content: Uint8Array) => writePrivateFile(file, content, false)
+export const replacePrivateFile = (file: string, content: Uint8Array) => writePrivateFile(file, content, true)
+
+export function privateFileExists(file: string) {
+  return Effect.tryPromise({
+    try: async () => {
+      await localPath(file)
+      try { await lstat(file); return true }
+      catch (error) {
+        if (error instanceof Error && "code" in error && error.code === "ENOENT") return false
+        throw error
+      }
+    },
+    catch: () => new StorageError(),
+  })
+}
+
+export function removePrivateFile(file: string) {
+  return Effect.gen(function* () {
+    yield* readPrivateFile(file)
+    yield* Effect.tryPromise({
+      try: async () => {
+        if (process.platform === "win32") { await windows("remove", file); return }
+        const parent = path.dirname(file)
+        await privateDirectory(parent)
+        await unlink(file)
+        const directory = await open(parent, constants.O_RDONLY | constants.O_DIRECTORY)
+        try { await directory.sync() } finally { await directory.close() }
+      },
+      catch: () => new StorageError(),
+    })
   }).pipe(Effect.uninterruptible)
 }

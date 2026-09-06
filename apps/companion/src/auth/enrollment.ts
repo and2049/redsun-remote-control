@@ -68,6 +68,11 @@ export function makeEnrollment<E>(
 
       cancel: local(invalidate),
 
+      resetLocal: local(Effect.gen(function* () {
+        yield* invalidate
+        enrolled = false
+      })),
+
       options(binding: string) {
         return Effect.gen(function* () {
           const state = yield* Effect.try(() => {

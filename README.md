@@ -3,8 +3,9 @@
 A private, browser-based remote interface for an existing background redsun server,
 using Tailscale for connectivity. Initially: one host and one remote controller.
 
-**Foundation only:** a tested passkey verification core exists, but there is no web
-interface, usable login/enrollment flow, operational backend connection, or remote access yet.
+**Backend in progress:** local approval, passkey authentication HTTP endpoints,
+session cookies, credential persistence and browser recovery are implemented. There
+is no web interface, operational redsun connection, or remote control yet.
 Do not expose this development listener through Tailscale Serve,
 Funnel, a LAN binding, or a public proxy.
 
@@ -46,13 +47,16 @@ verification run before deployment.
 
 - `apps/companion`: local service and eventual authenticated backend gateway.
   Its `src/auth` modules implement passkey verification, single-use challenges, and
-  scoped session lifetimes, plus a local enrollment approval coordinator. Approval
-  commands and usable browser login are not wired yet.
+  scoped session lifetimes, local enrollment approval, and authenticated HTTP routes.
   Its `src/backend` modules validate the pinned redsun RC contract and provide scoped
   status/heartbeat attachment. Its `src/storage` modules provide protected backend
-  handoff import and initial owner-credential persistence. Counter updates and recovery
-  remain pending. Automatic reconnection is not implemented; no backend credentials
+  handoff import, serialized credential counter updates, and local browser recovery.
+  Automatic reconnection is not implemented; no backend credentials
   are loaded by the development command.
 - `apps/web`: reserved browser application boundary, pending upstream UI audit.
 - `packages/protocol`: browser-safe companion contracts.
 - `.redsun/memory.md`: live progress, architecture decisions, and open questions.
+
+See [authentication backend operation and HTTP contract](docs/authentication.md)
+for the explicit authenticated serve mode, local approval/recovery commands, security
+limits and remaining deployment work. No-argument development mode remains health-only.

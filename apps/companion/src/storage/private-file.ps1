@@ -1,3 +1,4 @@
+param([switch] $Lock)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
@@ -19,13 +20,14 @@ function Assert-Private($Acl) {
   }
 }
 
-try {
-  [Console]::InputEncoding = [Text.UTF8Encoding]::new($false)
-  [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
-  $value = [Console]::In.ReadToEnd() | ConvertFrom-Json
-  $script:sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
+function Invoke-Operation($value) {
   Assert-Path $value.path
   switch ($value.action) {
+    'remove' {
+      Assert-Private ([IO.Directory]::GetAccessControl([IO.Path]::GetDirectoryName($value.path)))
+      Assert-Private ([IO.File]::GetAccessControl($value.path))
+      [IO.File]::Delete($value.path)
+    }
     'directory' {
       if (-not [IO.Directory]::Exists($value.path)) {
         if (-not [IO.Directory]::Exists([IO.Path]::GetDirectoryName($value.path))) { throw 'Missing parent' }
@@ -52,9 +54,10 @@ try {
         [Console]::Out.Write([Convert]::ToBase64String($bytes))
       } finally { $stream.Dispose() }
     }
-    'create' {
+    { $_ -eq 'create' -or $_ -eq 'replace' } {
       $parent = [IO.Path]::GetDirectoryName($value.path)
       Assert-Private ([IO.Directory]::GetAccessControl($parent))
+      if ($value.action -eq 'replace') { Assert-Private ([IO.File]::GetAccessControl($value.path)) }
       $temporary = [IO.Path]::Combine($parent, [Guid]::NewGuid().ToString('N') + '.tmp')
       $created = $false
       try {
@@ -66,14 +69,45 @@ try {
         $created = $true
         try {
           $bytes = [Convert]::FromBase64String($value.content)
+          if ($bytes.Length -gt 16384) { throw 'File too large' }
           $stream.Write($bytes, 0, $bytes.Length)
           $stream.Flush($true)
         } finally { $stream.Dispose() }
-        [IO.File]::Move($temporary, $value.path)
+        if ($value.action -eq 'replace') { [IO.File]::Replace($temporary, $value.path, [NullString]::Value) }
+        else { [IO.File]::Move($temporary, $value.path) }
       } finally {
         if ($created -and [IO.File]::Exists($temporary)) { [IO.File]::Delete($temporary) }
       }
     }
     default { throw 'Invalid action' }
+  }
+}
+
+try {
+  [Console]::InputEncoding = [Text.UTF8Encoding]::new($false)
+  [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+  $script:sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
+  if (-not $Lock) {
+    Invoke-Operation ([Console]::In.ReadToEnd() | ConvertFrom-Json)
+  } else {
+    $value = [Console]::In.ReadLine() | ConvertFrom-Json
+    Assert-Path $value.path
+    $owner = [IO.Path]::Combine([IO.Path]::GetDirectoryName($value.path), 'owner.json')
+    $lease = [IO.FileStream]::new($value.path, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    try {
+      Assert-Private ($lease.GetAccessControl())
+      [Console]::Out.WriteLine('locked')
+      [Console]::Out.Flush()
+      while ($null -ne ($line = [Console]::In.ReadLine())) {
+        try {
+          $command = $line | ConvertFrom-Json
+          if ($command.action -notin @('create', 'replace', 'remove')) { throw 'Invalid action' }
+          $command | Add-Member -NotePropertyName path -NotePropertyValue $owner
+          Invoke-Operation $command
+          [Console]::Out.WriteLine('ok')
+        } catch { [Console]::Out.WriteLine('error') }
+        [Console]::Out.Flush()
+      }
+    } finally { $lease.Dispose() }
   }
 } catch { exit 1 }

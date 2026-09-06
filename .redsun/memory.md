@@ -27,14 +27,15 @@ with no commit-body description. Do not include unrelated user work.
   documented boundary, not a frontend scaffold with speculative dependencies.
 - Strict TypeScript configuration and Bun tests.
 - Effect-scoped Bun listener, hard-bound to IPv4 loopback. Development uses an
-  ephemeral port; fixed operational port/origin selection is not decided.
-- Only `GET /health` exists. It reports foundation status and protocol version,
-  not backend readiness. Other paths return 404; unsupported health methods 405.
+  ephemeral port; authenticated serve mode requires explicit HTTPS origin/port.
+- No-argument development mode exposes only `GET /health`. It reports foundation
+  status/protocol version, not backend readiness. Authenticated mode additionally
+  mounts the narrowly defined authentication routes documented below.
 - Scope release stops the listener. CLI interruption aborts the scope.
-- Passkey verification, in-memory session lifetime, backend attachment cores, and
-  protected backend handoff import exist. Local approval and initial owner-record
-  persistence cores also exist, but no usable login/enrollment flow or operational backend connection,
-  UI, or Tailscale configuration exists.
+- Passkey verification, session cookies, local approval/recovery CLI controls,
+  protected credential/counter storage, and authentication HTTP wiring exist.
+  Backend attachment remains a core plus protected handoff importer; no operational
+  redsun connection, remote session/prompt routes, UI, or Tailscale configuration exists.
 
 Approved dependencies: Effect, TypeScript, Bun types. Initial exact pins match the
 locally inspected redsun toolchain: Effect 4.0.0-rc.112, TypeScript 5.8.2, Bun types
@@ -73,9 +74,10 @@ and do not retain potentially sensitive library messages.
 
 `invalidate` clears outstanding challenges and changes a generation counter so
 in-flight option generation/verification cannot succeed after invalidation. It is
-not yet wired to any CLI, HTTP endpoint, backend disable event, or browser session.
+wired to local recovery and the auth service's disable hook. Redsun backend policy
+events are not connected yet.
 
-### Required caller responsibilities before exposing authentication
+### Authentication invariants and exposure responsibilities
 
 - This is a cryptographic core, not enrollment authorization. Require explicit local
   approval for the exact browser/registration being accepted. Do not expose
@@ -94,9 +96,10 @@ not yet wired to any CLI, HTTP endpoint, backend disable event, or browser sessi
 - Add browser session expiration, secure cookies, logout/revocation, stream teardown,
   and local-only recovery. Invalidate in-flight ceremonies during relevant revocations.
 
-No auth routes are mounted. `/health` remains the only HTTP surface, and tests pin
-that `/auth/register` and `/auth/login` remain unavailable. Do not expose through
-Tailscale yet.
+Authentication HTTP/CLI wiring is implemented in the explicit serve mode described
+below; no-argument mode remains health-only. Legacy `/auth/register` and `/auth/login`
+paths stay unavailable. No backend proxy routes exist. Do not expose through
+Tailscale before backend policy supervision and route/event authorization are complete.
 
 ### Browser session lifetime core
 
@@ -110,9 +113,9 @@ Revocation aborts one session; clear invalidates all current sessions. The Effec
 factory closes the store on scope release, aborting signals and cancelling timers;
 a closed store cannot issue new sessions. No sessions persist across restart.
 
-This is not wired to cookies, login, HTTP routes, backend disable, or actual streams.
-Callers must issue tokens only after durable credential/counter updates and current
-enrollment checks; use signals for browser resources, never backend agent execution.
+`auth/service.ts` wires this to cookies/login through `auth/http.ts`, durable counter
+updates, local recovery and a disable hook. Actual backend disable events/streams
+remain unwired. Signals are for browser resources, never backend agent execution.
 Stream keepalives must not call authenticate merely to extend idle lifetime.
 
 ### Local enrollment coordinator and initial owner persistence
@@ -136,19 +139,72 @@ only after persistence returns. Failures return fixed safe errors and cannot ret
 the same proof. Successful enrollment prevents reopening that coordinator.
 
 `storage/owner.ts` stores the approved fingerprint and credential together in a
-single no-overwrite `owner.json` under the protected companion directory. The strict
+single initially no-overwrite `owner.json` under the protected companion directory. The strict
 v1 schema stores canonical HTTPS origin, user ID, public key, credential ID/counter
 and optional transports. Base64url must be canonical and counters fit WebAuthn uint32.
 Origin mismatch fails closed on load. No browser private key is stored. As with
 backend import, ambiguous filesystem publication failures require local inspection,
 not silent overwrite or assuming the destination was never published.
 
-Neither the coordinator nor owner creation is wired to CLI approval commands, HTTP,
-or backend disable/revocation. Production setup must load existing owner state before
-opening enrollment; no-overwrite creation remains the last defense against replacement.
-Counter updates, cross-process writer coordination, local reset/recovery and login
-session issuance remain pending. Stored public-key roundtrips are verified using
-real signed authentication fixtures on Windows; no real browser was enrolled.
+The auth service loads existing owner state before opening enrollment and wires the
+coordinator to local stdin commands and browser proof endpoints. No-overwrite creation
+remains the final defense against replacement. Local recovery can reset the coordinator
+only after protected owner deletion. Real signed fixtures exercise the HTTP/CLI flow
+on Windows; no real browser or hardware authenticator was enrolled.
+
+### Operational authentication, counter updates and recovery
+
+`storage/lease.ts` provides an exclusive OS-backed owner-store lease. Windows holds
+an owner-only `owner.lock` FileStream with FileShare.None in a private PowerShell
+helper. That same process executes owner-file mutations under the lease, so a parent
+crash cannot leave a separate mutation helper writing after the lease is released.
+Linux uses `/usr/bin/flock --nonblock` on an inherited protected file descriptor;
+the parent retains the open-file-description lock. Linux runtime verification remains
+pending. No package/utility was installed. `owner.lock` remains on disk; never delete
+it to bypass a live lock. Scope release/process death releases the OS lock.
+
+`makeOwnerStore` serializes reads/enrollment/counter updates/reset. Counter writes
+check the current identity and counter against the verified snapshot, preserve the
+public key/credential identity, and permit valid zero-to-zero synced passkey counters.
+Windows uses flushed temporary files and File.Replace; Linux uses rename and parent
+directory fsync. Stale or concurrent updates cannot overwrite a winning revision.
+This has not been certified against simulated power loss or filesystem faults.
+
+`auth/service.ts` serializes login and local approval. Tokens are issued only after
+counter persistence and generation/lease rechecks. Recovery invalidates sessions and
+pending login generations before waiting for owner deletion, preventing in-flight
+login from issuing a session after revocation begins. Storage errors and lease loss
+fail closed. The disable hook clears authorization and remains disabled even after
+local recovery; it is not connected to redsun policy events yet.
+
+`auth/http.ts` mounts POST-only `/auth/binding`, `/auth/register/options`,
+`/auth/register/verify`, `/auth/login/options`, `/auth/login/verify`, `/auth/session`
+and `/auth/logout` in authenticated mode. Require exact configured Origin and Host,
+same-origin Fetch Metadata when present, JSON, and no compressed bodies. Bodies are
+bounded to 64 KiB and five seconds; relevant duplicate/malformed cookies are rejected.
+Empty requests must be exactly `{}` (Effect's empty Struct does not enforce that).
+Schemas bound WebAuthn JSON; optional extension results/hints are not trusted as
+authority. Server-issued binding cookies are verified against an in-memory store.
+
+Cookies use __Host- prefixes, Path=/, Secure, HttpOnly, SameSite=Strict, no Domain.
+Bindings last five minutes; sessions use the approved 24-hour absolute/one-hour idle
+policy. Tokens never appear in JSON. Auth replies are no-store with generic errors
+and no CORS allowance. The process-wide auth bucket allows burst 30 and refills one
+request per two seconds, ignoring spoofable forwarded IP headers. This is bounded
+single-controller admission, not per-device fairness; peers can exhaust the budget.
+Capacities: 128 bindings/login challenges, 32 enrollment requests, 64 sessions.
+
+CLI: `serve --origin <https-origin> --port <port>` explicitly mounts authentication
+on loopback with a fixed nonzero port (no substitution), without TLS/Serve/backend
+setup. Local stdin commands are `enroll`, `pending`, `approve <requestID> <fingerprint>`,
+`cancel`, and `recover confirm`. Closing stdin does not stop the listener; background
+local-control IPC is not implemented. `recover --confirm` is offline browser recovery,
+refused while a companion holds the lease. Recovery never revokes backend credentials.
+Origin changes require recovery and re-enrollment. Configuration is supplied through
+explicit CLI arguments; no operational configuration-file loader exists yet.
+
+`docs/authentication.md` defines these commands, routes, limits and failure semantics.
+No frontend pages, operational redsun attachment, or real Tailscale/browser test exists.
 
 ## Architecture direction
 
@@ -274,8 +330,8 @@ rejected before creating the destination. No-argument CLI remains health-only.
 
 Windows permission and CLI behavior is tested with disposable synthetic fixtures
 outside the repository. Linux implementation is typechecked but has not run on Linux;
-do not describe cross-platform deployment as verified. Initial owner-record creation
-exists; atomic updates/recovery, protected discovery, and operational loading remain pending.
+do not describe cross-platform deployment as verified. Owner creation, atomic counter
+updates and recovery exist; protected discovery and operational backend loading remain pending.
 
 ### Earlier discovery audit
 
@@ -306,10 +362,10 @@ was reported by the user; phone-to-host connectivity has not been verified.
 3. Local vertical slice: scoped in-memory status/heartbeat attachment and protected
    backend handoff import implemented and fixture-tested on Windows. Protected discovery, supervision, sessions/prompts, scoped SSE
    and interruption remain pending. No remote exposure before authentication.
-4. Security: passkey crypto/challenge, session lifetime, local approval coordinator,
-   and initial owner persistence implemented and tested. HTTP validation/rate limits,
-   approval CLI, counter updates, browser session wiring, local recovery,
-   revocation wiring, and approved route/event surface remain pending.
+4. Security: passkeys, local approval, protected counters, browser sessions, recovery,
+   HTTP validation/rate limits and CLI/auth route wiring implemented and tested on
+   Windows. Backend policy/event revocation wiring and session/prompt authorization
+   remain pending; the complete backend is not yet ready for private deployment.
 5. Private deployment: stable HTTPS origin, Serve setup, independent background
    companion lifecycle, real phone test. Pending.
 6. Mobile completion: forms/permissions, directory changes, models/agents, reconnect,
@@ -371,14 +427,15 @@ The user authorized backend-independent work while the redsun agent finished, th
 authorized review and integration after it completed.
 Frontend implementation and UI audit are now deferred while the user gathers design
 references. The finalized contract supersedes the provisional schemas inspected earlier.
-`@simplewebauthn/server` 14.0.1 (MIT) is approved for the authentication core. No
-browser-facing auth routes will be exposed during this step.
+`@simplewebauthn/server` 14.0.1 (MIT) is approved for authentication. The initial
+crypto-only step exposed no routes; the subsequent explicitly configured serve mode
+now exposes the tested authentication surface, still without Tailscale deployment.
 
 ## Verification
 
 Run from repository root: `bun install --frozen-lockfile`, `bun run typecheck`,
 `bun test`. Development: `bun run dev` (ephemeral loopback health listener only).
-Current verification: frozen install and typecheck pass; 147 tests, 0 failures,
+Current verification: frozen install and typecheck pass; 164 tests, 0 failures,
 including real WebAuthn registration and signed authentication for three algorithms,
 negative security cases, concurrency, invalidation, listener cleanup, and scoped
 attachment fixtures (redirect refusal, proxy isolation, identity/restart checks,
@@ -391,13 +448,18 @@ decoding, and actual CLI subprocess imports without credential output or listene
 Enrollment tests cover proof-before-approval, exact fingerprint matching, window
 expiry, cancellation/in-flight invalidation, concurrent capacity/approval, persistence
 failure and ordering, scope release, strict owner decoding and signed login after reload.
+New auth integration tests cover the actual HTTP/local CLI sequence, durable counters,
+concurrent/stale writers, restart session invalidation, local recovery of active and
+in-flight authorization, CSRF/Host validation, request limits, rate limits, lease
+exclusion, and lock release after an actual synthetic companion process is killed.
 Redsun verification run separately from its core directory:
 `bun run test ../server/test/remote-control.test.ts ../server/test/remote-admission.test.ts ../server/test/remote-projection.test.ts`
 passed 8 tests / 145 assertions. These use its isolated test harness, not the installed
 service. The companion adapter has not yet been exercised against an actual redsun
 server process; its network tests use isolated Bun fixture servers.
-CLI signal handling has not been verified end to end on Windows; the service scope's
-listener cleanup is integration-tested. No real backend or phone test has run.
+Graceful CLI signal handling remains unverified end to end on Windows; forced process
+termination/lease release and service-scope listener cleanup are integration-tested.
+No real redsun backend or phone test has run.
 Do not store credentials, private device names, or machine-specific setup files in
 the repository. No source from OpenCode has been copied; licensing selection for
 this repository remains open before importing upstream code or distributing it.
