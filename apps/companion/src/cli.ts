@@ -8,6 +8,7 @@ import { makeAuthentication } from "./auth/service"
 import { makeAuthenticationHttp } from "./auth/http"
 import { handleRequest } from "./http"
 import { localCommand } from "./local"
+import { probeBackend } from "./backend/probe"
 
 const controller = new AbortController()
 const stop = () => controller.abort()
@@ -21,6 +22,7 @@ const program = Effect.scoped(
       console.log("Usage: companion [--help | import-backend <absolute-private-handoff-file>]")
       console.log("Authenticated mode: companion serve --origin <https-origin> --port <loopback-port>")
       console.log("Offline browser recovery: companion recover --confirm (refused while a companion owns the store)")
+      console.log("Passive backend check: companion check-backend (protected discovery and scoped status only)")
       console.log("No arguments: development health listener. Import preserves the source and never enables or starts redsun.")
       return
     }
@@ -28,6 +30,12 @@ const program = Effect.scoped(
       const directory = yield* Effect.try(() => dataDirectory())
       yield* recoverOwner(directory)
       console.log("Browser enrollment removed. Backend enrollment is unchanged.")
+      return
+    }
+    if (command.kind === "check-backend") {
+      const directory = yield* Effect.try(() => dataDirectory())
+      yield* probeBackend(directory)
+      console.log("Backend identity and scoped access verified. No listener, heartbeat, or policy change was made.")
       return
     }
     if (command.kind === "serve") {

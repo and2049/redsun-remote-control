@@ -60,3 +60,7 @@ verification run before deployment.
 See [authentication backend operation and HTTP contract](docs/authentication.md)
 for the explicit authenticated serve mode, local approval/recovery commands, security
 limits and remaining deployment work. No-argument development mode remains health-only.
+
+The [passive backend attachment guide](docs/backend-attachment.md) covers the
+`check-backend` diagnostic, protected discovery, supervisor core and remaining steps
+before a phone test.

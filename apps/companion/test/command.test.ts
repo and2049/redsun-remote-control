@@ -7,6 +7,8 @@ test("parses only explicitly supported commands", () => {
   expect(parseCommand(["import-backend", "/private/handoff"])).toEqual({ kind: "import-backend", source: "/private/handoff" })
   expect(parseCommand(["serve", "--origin", "https://host.example", "--port", "43123"])).toEqual({ kind: "serve", origin: "https://host.example", port: 43123 })
   expect(parseCommand(["recover", "--confirm"])).toEqual({ kind: "recover" })
+  expect(parseCommand(["check-backend"])).toEqual({ kind: "check-backend" })
+  expect(() => parseCommand(["check-backend", "http://127.0.0.1:12345"])).toThrow()
 })
 
 test.each([["import-backend"], ["unknown"], ["--help", "extra"], ["import-backend", "--token"], ["import-backend", "file", "extra"]].map((args) => ({ args })))(

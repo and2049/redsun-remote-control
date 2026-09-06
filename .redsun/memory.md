@@ -34,7 +34,8 @@ with no commit-body description. Do not include unrelated user work.
 - Scope release stops the listener. CLI interruption aborts the scope.
 - Passkey verification, session cookies, local approval/recovery CLI controls,
   protected credential/counter storage, and authentication HTTP wiring exist.
-  Backend attachment remains a core plus protected handoff importer; no operational
+  Backend attachment includes protected discovery, a passive CLI probe and a scoped
+  supervisor core, not yet mounted in serve mode; no operational
   redsun connection, remote session/prompt routes, UI, or Tailscale configuration exists.
 
 Approved dependencies: Effect, TypeScript, Bun types. Initial exact pins match the
@@ -253,7 +254,7 @@ upstream API surface.
 - Discovery file is `<ordinary-registration>.remote` with exactly id/version/url/pid;
   no unrestricted password. It can be stale. `/api/remote` must report supported,
   enabled, enrolled, version 1, matching durable backendID and registration processID.
-- Lease is 30 seconds; the future supervisor should heartbeat roughly every 10 seconds.
+- Lease is 30 seconds; the supervisor's caller should heartbeat roughly every 10 seconds.
   `connected:false` means companion-ready, not an authenticated browser. Browser
   connection reporting is not implemented here yet.
 - **Scoped SSE is hints only**: server.connected, remote.status, remote.sync. No raw
@@ -279,8 +280,9 @@ Handoff decoding validates data only; it does NOT validate a file's ownership/AC
 object in an Effect scope, verifies `/api/remote`, and returns status/heartbeat methods.
 Every result is checked against both identities and current enabled/supported state.
 Any failure closes the handle; a supervisor must rediscover and attach again explicitly.
-Scope exit or close aborts pending requests. No supervisor, automatic retry, heartbeat
-timer, discovery reader, session methods, or event stream is implemented yet.
+Scope exit or close aborts pending requests. The supervisor/discovery cores described
+below wrap attachment with passive retry and heartbeat scheduling. Session methods
+and event streams remain unimplemented.
 
 `backend/transport.ts` is intentionally limited to status and heartbeat, not a generic
 proxy. Uses Node HTTP directly so environment HTTP/HTTPS/ALL_PROXY settings cannot
@@ -298,6 +300,42 @@ invalid endpoint, refusal, unavailability, identity mismatch, and a closed handl
 Identity validation occurs on the first authenticated status response, as required by
 the redsun contract. It cannot authenticate a malicious same-user local process before
 sending the credential; local OS-user trust and protected discovery/import are necessary.
+
+### Protected discovery and supervision
+
+`backend/discovery.ts` reads only the imported handoff's registration path through
+the existing bounded protected-file reader. It strictly decodes UTF-8 JSON and the
+password-free registration schema, then validates the loopback endpoint before any
+network request. No fallback to ordinary registrations or endpoint inference exists.
+Missing/unreadable/nonprivate files map to safe unavailable errors; malformed contracts
+and invalid endpoints remain distinct. Permissions are never silently repaired.
+
+`backend/supervisor.ts` is an Effect-scoped core with explicit timeout, heartbeat and
+retry intervals, a trusted connected predicate and an idempotent invalidation effect.
+It rereads discovery on every attempt, validates status, and sends an initial heartbeat
+before publishing readiness. Subsequent heartbeats are sequential. Timeout plus
+heartbeat interval must be below thirty seconds. Only unavailable failures retry;
+refusal, identity mismatch and invalid contracts/endpoints stop the instance. No
+silent re-enrollment or adoption of another backend occurs.
+
+Ready snapshots expose stable backend/process IDs and a generation AbortSignal, not
+credentials or endpoints. Failure aborts the generation and runs invalidation before
+retry; scope release cancels pending HTTP and stops heartbeats. Callbacks must be
+idempotent. These are browser-resource signals, never agent interruption. Tests cover
+fresh-process rediscovery, refusal/identity failure, timing validation and shutdown
+during a stalled heartbeat. The supervisor is not yet wired to serve/authentication;
+SSE-driven policy teardown and authorized session/prompt operations remain pending.
+
+CLI `check-backend` loads protected enrollment/discovery and makes one scoped status
+request with a five-second network deadline. It prints fixed success/failure text,
+not paths, credentials or response bodies. It sends no heartbeat and starts no listener,
+backend, enrollment or policy change. An actual CLI subprocess is fixture-tested.
+See `docs/backend-attachment.md` for the contract and phone-test prerequisites.
+
+Windows live-integration risk: the pinned redsun discovery publisher uses filesystem
+`mode: 0600`, not explicit native owner-only ACL creation. Actual protection depends
+on inherited Windows ACLs and remains unverified. Do not weaken companion validation
+or silently repair runtime files. No live discovery/credential file was inspected.
 
 ### Protected local backend import
 
@@ -331,7 +369,8 @@ rejected before creating the destination. No-argument CLI remains health-only.
 Windows permission and CLI behavior is tested with disposable synthetic fixtures
 outside the repository. Linux implementation is typechecked but has not run on Linux;
 do not describe cross-platform deployment as verified. Owner creation, atomic counter
-updates and recovery exist; protected discovery and operational backend loading remain pending.
+updates and recovery exist; protected discovery and explicit CLI probe loading now
+exist. Operational serve-mode backend loading remains pending.
 
 ### Earlier discovery audit
 
@@ -359,9 +398,10 @@ was reported by the user; phone-to-host connectivity has not been verified.
    including a real loopback listener and scope-release check.
 2. Integration audit: finalized v1 backend contract reviewed and pinned; narrow adapter
    chosen. Focused redsun RC tests pass. Frontend/UI audit remains explicitly deferred.
-3. Local vertical slice: scoped in-memory status/heartbeat attachment and protected
-   backend handoff import implemented and fixture-tested on Windows. Protected discovery, supervision, sessions/prompts, scoped SSE
-   and interruption remain pending. No remote exposure before authentication.
+3. Local vertical slice: scoped status/heartbeat attachment, protected backend import
+   and discovery, passive CLI probe and supervisor core implemented and fixture-tested
+   on Windows. Serve integration, sessions/prompts, scoped SSE and interruption remain
+   pending. No remote exposure before authorization and policy teardown.
 4. Security: passkeys, local approval, protected counters, browser sessions, recovery,
    HTTP validation/rate limits and CLI/auth route wiring implemented and tested on
    Windows. Backend policy/event revocation wiring and session/prompt authorization
@@ -435,7 +475,7 @@ now exposes the tested authentication surface, still without Tailscale deploymen
 
 Run from repository root: `bun install --frozen-lockfile`, `bun run typecheck`,
 `bun test`. Development: `bun run dev` (ephemeral loopback health listener only).
-Current verification: frozen install and typecheck pass; 164 tests, 0 failures,
+Current verification: frozen install and typecheck pass; 181 tests, 0 failures,
 including real WebAuthn registration and signed authentication for three algorithms,
 negative security cases, concurrency, invalidation, listener cleanup, and scoped
 attachment fixtures (redirect refusal, proxy isolation, identity/restart checks,
@@ -452,6 +492,10 @@ New auth integration tests cover the actual HTTP/local CLI sequence, durable cou
 concurrent/stale writers, restart session invalidation, local recovery of active and
 in-flight authorization, CSRF/Host validation, request limits, rate limits, lease
 exclusion, and lock release after an actual synthetic companion process is killed.
+Discovery/supervision tests cover protected-file rejection, passive CLI status-only
+requests, heartbeat reporting, fresh-process retry, terminal refusal/identity failures,
+and cancellation of stalled requests on scope release. All 181 tests make 501 assertions
+across 17 files on Windows; no additional dependency was installed.
 Redsun verification run separately from its core directory:
 `bun run test ../server/test/remote-control.test.ts ../server/test/remote-admission.test.ts ../server/test/remote-projection.test.ts`
 passed 8 tests / 145 assertions. These use its isolated test harness, not the installed
