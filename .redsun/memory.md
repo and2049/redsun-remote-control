@@ -31,7 +31,7 @@ with no commit-body description. Do not include unrelated user work.
 - Only `GET /health` exists. It reports foundation status and protocol version,
   not backend readiness. Other paths return 404; unsupported health methods 405.
 - Scope release stops the listener. CLI interruption aborts the scope.
-- Passkey verification and in-memory backend attachment cores exist, but no usable
+- Passkey verification, in-memory session lifetime, and backend attachment cores exist, but no usable
   login/enrollment flow, protected import/storage, operational backend connection,
   UI, or Tailscale configuration exists.
 
@@ -96,6 +96,23 @@ not yet wired to any CLI, HTTP endpoint, backend disable event, or browser sessi
 No auth routes are mounted. `/health` remains the only HTTP surface, and tests pin
 that `/auth/register` and `/auth/login` remain unavailable. Do not expose through
 Tailscale yet.
+
+### Browser session lifetime core
+
+`auth/sessions.ts` issues random 256-bit bearer tokens and retains only SHA-256
+token digests. Sessions are bounded by caller-supplied capacity and use monotonic
+24-hour absolute / one-hour idle deadlines. Successful authentication refreshes
+idle expiry, never absolute expiry. Timers expire authorization even without new
+requests; each session exposes an AbortSignal for future browser-stream teardown.
+Timer callbacks recheck the deadline rather than assuming timers fire precisely.
+Revocation aborts one session; clear invalidates all current sessions. The Effect
+factory closes the store on scope release, aborting signals and cancelling timers;
+a closed store cannot issue new sessions. No sessions persist across restart.
+
+This is not wired to cookies, login, HTTP routes, backend disable, or actual streams.
+Callers must issue tokens only after durable credential/counter updates and current
+enrollment checks; use signals for browser resources, never backend agent execution.
+Stream keepalives must not call authenticate merely to extend idle lifetime.
 
 ## Architecture direction
 
@@ -219,13 +236,39 @@ was reported by the user; phone-to-host connectivity has not been verified.
 3. Local vertical slice: scoped in-memory status/heartbeat attachment implemented and
    fixture-tested. Protected import/discovery, supervision, sessions/prompts, scoped SSE
    and interruption remain pending. No remote exposure before authentication.
-4. Security: passkey crypto/challenge core implemented and tested. Local approval,
-   durable enrollment, HTTP validation/rate limits, browser sessions, local recovery,
+4. Security: passkey crypto/challenge and session lifetime cores implemented and tested. Local approval,
+   durable enrollment, HTTP validation/rate limits, browser session wiring, local recovery,
    revocation wiring, and approved route/event surface remain pending.
 5. Private deployment: stable HTTPS origin, Serve setup, independent background
    companion lifecycle, real phone test. Pending.
 6. Mobile completion: forms/permissions, directory changes, models/agents, reconnect,
    uncertain writes and approval races. Pending.
+
+## Approved backend completion policies
+
+- Complete the companion backend while deferring frontend UI. The redsun integration
+  branch need not be merged into dev for isolated integration work. If a genuine
+  upstream blocker needs delegation, the user permits `claude -p`, but requires
+  verification of the requested Fable 5.1 model rather than a default Opus fallback.
+- Support Windows and Ubuntu with per-user application-data storage outside the
+  repository. Enforce Windows ACLs or Unix owner-only permissions and fail closed
+  when protection cannot be verified. Store no agent history or provider credentials.
+- Import backend handoffs explicitly through the local CLI; never silently overwrite
+  an attachment. Preserve the source unless explicit deletion is requested after a
+  successful import.
+- Local CLI opens a five-minute enrollment window. Require passkey proof and explicit
+  host approval of the exact registration, with a matching fingerprint displayed on
+  host and browser. No remote replacement of an enrolled controller.
+- Browser sessions use Secure, HttpOnly, SameSite=Strict cookies, a 24-hour absolute
+  lifetime and one-hour idle timeout. Keep sessions in memory; restart requires login.
+  Logout, local revocation and backend disable invalidate relevant sessions and close
+  browser streams, without cancelling agent execution.
+- Configure HTTPS origin and loopback port explicitly; no hostname inference or port
+  substitution. Origin changes require local reset/re-enrollment. Provide foreground
+  operation and background-install instructions, not automatic service installation
+  or Tailscale changes.
+- Challenge windows are five minutes, with bounded pending requests and tested auth
+  rate limits. These are approved direction, not implemented end-to-end behavior.
 
 ## Open decisions — ask before implementation
 
@@ -233,14 +276,12 @@ was reported by the user; phone-to-host connectivity has not been verified.
   recovery are approved. Platform and security-key authenticators are allowed.
   Ubuntu as a host needs no passkey keychain; Ubuntu as a controller depends on
   browser/authenticator support and needs live verification. An alternative login
-  method may be considered later, not implemented now. Exact enrollment ceremony,
-  persistence, browser session lifetime, and hostname-change behavior remain open.
-- Backend adapter selection is settled (narrow adapter). Protected local import/storage
-  location, source handoff cleanup behavior, and local CLI setup UX remain to be settled.
+  method may be considered later, not implemented now.
+- Backend adapter selection is settled (narrow adapter).
 - Frontend: audit a pinned OpenCode v2 browser source set, licenses, dependency
   closure, and native integration removal before adding UI dependencies.
-- Background companion installation and supported host operating systems.
-- Stable listener port, HTTPS origin setup, and who owns changes to Tailscale Serve.
+- Actual deployment origin/port and any live installation or Tailscale changes still
+  require explicit local setup authorization.
 
 ## Redsun handoff
 
@@ -266,11 +307,13 @@ browser-facing auth routes will be exposed during this step.
 
 Run from repository root: `bun install --frozen-lockfile`, `bun run typecheck`,
 `bun test`. Development: `bun run dev` (ephemeral loopback health listener only).
-Current verification: frozen install and typecheck pass; 99 tests, 0 failures,
+Current verification: frozen install and typecheck pass; 113 tests, 0 failures,
 including real WebAuthn registration and signed authentication for three algorithms,
 negative security cases, concurrency, invalidation, listener cleanup, and scoped
 attachment fixtures (redirect refusal, proxy isolation, identity/restart checks,
-HTTP refusal, response bounds, timeout, and cancellation).
+HTTP refusal, response bounds, timeout, and cancellation). Session tests cover idle
+and absolute deadlines, autonomous expiry signals, capacity reclamation, revocation,
+restart isolation, immutable policy capture, and Effect scope cleanup.
 Redsun verification run separately from its core directory:
 `bun run test ../server/test/remote-control.test.ts ../server/test/remote-admission.test.ts ../server/test/remote-projection.test.ts`
 passed 8 tests / 145 assertions. These use its isolated test harness, not the installed
