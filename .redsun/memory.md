@@ -31,8 +31,8 @@ with no commit-body description. Do not include unrelated user work.
 - Only `GET /health` exists. It reports foundation status and protocol version,
   not backend readiness. Other paths return 404; unsupported health methods 405.
 - Scope release stops the listener. CLI interruption aborts the scope.
-- Passkey verification, in-memory session lifetime, and backend attachment cores exist, but no usable
-  login/enrollment flow, protected import/storage, operational backend connection,
+- Passkey verification, in-memory session lifetime, backend attachment cores, and
+  protected backend handoff import exist, but no usable login/enrollment flow or operational backend connection,
   UI, or Tailscale configuration exists.
 
 Approved dependencies: Effect, TypeScript, Bun types. Initial exact pins match the
@@ -188,7 +188,7 @@ object in an Effect scope, verifies `/api/remote`, and returns status/heartbeat 
 Every result is checked against both identities and current enabled/supported state.
 Any failure closes the handle; a supervisor must rediscover and attach again explicitly.
 Scope exit or close aborts pending requests. No supervisor, automatic retry, heartbeat
-timer, file reader/importer, session methods, or event stream is implemented yet.
+timer, discovery reader, session methods, or event stream is implemented yet.
 
 `backend/transport.ts` is intentionally limited to status and heartbeat, not a generic
 proxy. Uses Node HTTP directly so environment HTTP/HTTPS/ALL_PROXY settings cannot
@@ -206,6 +206,40 @@ invalid endpoint, refusal, unavailability, identity mismatch, and a closed handl
 Identity validation occurs on the first authenticated status response, as required by
 the redsun contract. It cannot authenticate a malicious same-user local process before
 sending the credential; local OS-user trust and protected discovery/import are necessary.
+
+### Protected local backend import
+
+`storage/private-file.ts` and its Windows PowerShell helper implement bounded
+16-KiB reads and no-overwrite file publication. Windows uses native .NET owner-only
+ACLs at creation and checks ownership/access rules on the opened read handle.
+Unix uses owner-only modes, fstat ownership/type checks, O_NOFOLLOW, and rejects
+multiply linked input files. Both reject symbolic-link/reparse-point path components;
+Windows also rejects UNC, drive-relative, device and alternate-stream paths.
+Existing nonprivate files/directories are refused, never silently chmod/ACL-repaired.
+Same-user processes and local administrators remain trusted; this is permission
+protection, not encryption or a sandbox against concurrent same-user manipulation.
+
+Writes use a private temporary sibling, flush file contents, and publish without
+replacement (Windows File.Move; Unix link/unlink plus parent directory fsync).
+Ordinary failures clean owned temporary files. Forced termination can leave a private
+temporary file or an already-published destination; reruns still never overwrite it.
+Windows subprocess execution is bounded to 15 seconds with fixed safe errors and
+no credential-bearing command arguments. Secret data travels only over pipes.
+
+`storage/backend.ts` strictly decodes protected handoffs and loads the stored
+Redacted enrollment. The CLI's `import-backend <absolute-private-handoff-file>`
+stores `backend.json` in `%LOCALAPPDATA%/redsun-remote-control` or
+`${XDG_DATA_HOME:-$HOME/.local/share}/redsun-remote-control`. The base application-data
+directory must exist; only the final private directory is created. No arbitrary
+destination CLI option exists. The source is always preserved; explicit optional
+source deletion remains pending. Import performs no network requests, backend
+enrollment, enablement, listener startup, or Tailscale changes. Invalid handoffs are
+rejected before creating the destination. No-argument CLI remains health-only.
+
+Windows permission and CLI behavior is tested with disposable synthetic fixtures
+outside the repository. Linux implementation is typechecked but has not run on Linux;
+do not describe cross-platform deployment as verified. Browser enrollment persistence,
+atomic updates/recovery, protected discovery, and operational loading remain pending.
 
 ### Earlier discovery audit
 
@@ -233,8 +267,8 @@ was reported by the user; phone-to-host connectivity has not been verified.
    including a real loopback listener and scope-release check.
 2. Integration audit: finalized v1 backend contract reviewed and pinned; narrow adapter
    chosen. Focused redsun RC tests pass. Frontend/UI audit remains explicitly deferred.
-3. Local vertical slice: scoped in-memory status/heartbeat attachment implemented and
-   fixture-tested. Protected import/discovery, supervision, sessions/prompts, scoped SSE
+3. Local vertical slice: scoped in-memory status/heartbeat attachment and protected
+   backend handoff import implemented and fixture-tested on Windows. Protected discovery, supervision, sessions/prompts, scoped SSE
    and interruption remain pending. No remote exposure before authentication.
 4. Security: passkey crypto/challenge and session lifetime cores implemented and tested. Local approval,
    durable enrollment, HTTP validation/rate limits, browser session wiring, local recovery,
@@ -307,13 +341,16 @@ browser-facing auth routes will be exposed during this step.
 
 Run from repository root: `bun install --frozen-lockfile`, `bun run typecheck`,
 `bun test`. Development: `bun run dev` (ephemeral loopback health listener only).
-Current verification: frozen install and typecheck pass; 113 tests, 0 failures,
+Current verification: frozen install and typecheck pass; 133 tests, 0 failures,
 including real WebAuthn registration and signed authentication for three algorithms,
 negative security cases, concurrency, invalidation, listener cleanup, and scoped
 attachment fixtures (redirect refusal, proxy isolation, identity/restart checks,
 HTTP refusal, response bounds, timeout, and cancellation). Session tests cover idle
 and absolute deadlines, autonomous expiry signals, capacity reclamation, revocation,
 restart isolation, immutable policy capture, and Effect scope cleanup.
+Storage tests cover Windows ACL rejection, bounded reads/writes, linked-path
+rejection, no-overwrite publication and races, source preservation, strict handoff
+decoding, and actual CLI subprocess imports without credential output or listeners.
 Redsun verification run separately from its core directory:
 `bun run test ../server/test/remote-control.test.ts ../server/test/remote-admission.test.ts ../server/test/remote-projection.test.ts`
 passed 8 tests / 145 assertions. These use its isolated test harness, not the installed
