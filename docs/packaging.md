@@ -60,6 +60,10 @@ environment variable instead of a script parameter.
   http://127.0.0.1:<port>` only when the mapping is missing and certificates exist;
   it refuses conflicts. `serveCommand(port)` is the display string. Both accept an
   injectable runner for tests and never reset existing Serve configuration.
+- `removeHandoff(directory?)`: deletes the stored handoff (no-op when absent) so a host
+  that revoked companion credentials can enroll again. `serveCompanion` also yields
+  `backend()`, the supervisor snapshot (`connecting`, `ready`, `unavailable`, `stopped`
+  with a reason, `closed`) so a host can tell a rejected credential from a starting one.
 - `importHandoffFile(path, directory?)`, `checkBackend(directory?)`,
   `recoverBrowser(directory?)`, `dataDirectory()`, `parseCommand`, `validateServe`,
   `StorageError`, and the `Health` type.

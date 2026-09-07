@@ -3,7 +3,7 @@ import { mkdtemp, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { Effect, Redacted } from "effect"
-import { importHandoff, serveCompanion } from "../src/companion"
+import { importHandoff, removeHandoff, serveCompanion } from "../src/companion"
 import { main } from "../src/main"
 import { loadBackend } from "../src/storage/backend"
 import { handoff } from "./backend/fixture"
@@ -29,6 +29,10 @@ test("in-process handoff import validates, persists once and never overwrites", 
   expect(Redacted.value(await Effect.runPromise(loadBackend(directory)))).toEqual(handoff)
   await expect(Effect.runPromise(importHandoff({ ...handoff, version: 2 }, path.join(data.root, "other")))).rejects.toThrow("Protected local storage")
   expect(await readdir(data.root)).toEqual(["companion"])
+  await Effect.runPromise(removeHandoff(directory))
+  await expect(Effect.runPromise(loadBackend(directory))).rejects.toThrow("Protected local storage")
+  await Effect.runPromise(removeHandoff(directory))
+  expect(await Effect.runPromise(importHandoff(handoff, directory))).toEqual({ backendID: handoff.backendID })
 }, 15000)
 
 test("programmatic serve rejects invalid configuration before touching storage", async () => {

@@ -1,5 +1,6 @@
 export { main, type MainOptions } from "./main"
-export { checkBackend, importHandoff, importHandoffFile, recoverBrowser, serveCompanion, type Local, type ServeOptions } from "./companion"
+export { checkBackend, importHandoff, importHandoffFile, recoverBrowser, removeHandoff, serveCompanion, type Local, type ServeOptions } from "./companion"
+export type { BackendSnapshot } from "./backend/supervisor"
 export { applyServe, inspectTailscale, serveCommand, type Mapping, type Runner, type Tailscale } from "./tailscale"
 export { parseCommand, validateServe, type Command } from "./command"
 export { dataDirectory } from "./storage/backend"

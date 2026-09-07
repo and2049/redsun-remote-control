@@ -2,7 +2,7 @@ import path from "node:path"
 import { homedir } from "node:os"
 import { Effect, Redacted } from "effect"
 import { decodeHandoff } from "../backend/contract"
-import { createPrivateFile, ensurePrivateDirectory, readPrivateFile, StorageError } from "./private-file"
+import { createPrivateFile, ensurePrivateDirectory, privateFileExists, readPrivateFile, removePrivateFile, StorageError } from "./private-file"
 
 export function dataDirectory(
   platform: string = process.platform,
@@ -44,6 +44,11 @@ export function storeHandoff(value: unknown, directory: string) {
     yield* createPrivateFile(path.join(directory, "backend.json"), Buffer.from(JSON.stringify(handoff)))
     return { backendID: handoff.backendID }
   }).pipe(Effect.uninterruptible)
+}
+
+export function removeBackend(directory: string) {
+  const file = path.join(directory, "backend.json")
+  return privateFileExists(file).pipe(Effect.flatMap((exists) => (exists ? removePrivateFile(file) : Effect.void)))
 }
 
 export function importBackend(source: string, directory: string) {

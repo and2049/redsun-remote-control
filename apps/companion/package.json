@@ -1,6 +1,6 @@
 {
   "name": "redsun-remote-control",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Passkey-protected remote control companion for a redsun host",
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/and2049/redsun-remote-control.git" },

@@ -2,7 +2,7 @@ import { Effect } from "effect"
 import type { Authentication } from "./auth/service"
 import { serve } from "./server"
 import { validateServe } from "./command"
-import { dataDirectory, importBackend, storeHandoff } from "./storage/backend"
+import { dataDirectory, importBackend, removeBackend, storeHandoff } from "./storage/backend"
 import { recoverOwner } from "./storage/owner"
 import { makeAuthentication } from "./auth/service"
 import { makeAuthenticationHttp } from "./auth/http"
@@ -31,6 +31,8 @@ export const importHandoffFile = (source: string, override?: string) =>
 export const importHandoff = (handoff: unknown, override?: string) =>
   directory(override).pipe(Effect.flatMap((target) => storeHandoff(handoff, target)))
 
+export const removeHandoff = (override?: string) => directory(override).pipe(Effect.flatMap(removeBackend))
+
 export const checkBackend = (override?: string) => directory(override).pipe(Effect.flatMap(probeBackend))
 
 export const recoverBrowser = (override?: string) => directory(override).pipe(Effect.flatMap(recoverOwner))
@@ -46,8 +48,8 @@ export function serveCompanion(options: ServeOptions) {
       const pathname = new URL(request.url).pathname
       if (pathname === "/health") return handleRequest(request)
       if (pathname.startsWith("/auth/") || !remote) return http.handle(request)
-      return remote(request)
+      return remote.handle(request)
     }, options.backend ? 6 * 1024 * 1024 : 65536)
-    return { command: (line: string) => localCommand(auth, line), local: auth.local }
+    return { command: (line: string) => localCommand(auth, line), local: auth.local, backend: () => remote?.snapshot() }
   })
 }

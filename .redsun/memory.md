@@ -560,6 +560,11 @@ not an app defect (programmatic clicks behaved).
   confirmation (never automatic). The supervisor still stops permanently on policy
   refusal (401/403); redsun restarts a fresh companion on enable, and the stop reason
   is now logged to stderr via `onStop`.
+- 0.3.0: `removeHandoff` and `serveCompanion().backend()` were added after the user's
+  fresh-install rehearsal: revoking on the backend left the companion's stale
+  `backend.json` in place, so the auto-started companion was refused (supervisor stopped
+  silently, dialog said only unavailable) and re-enrollment was blocked by never-overwrite.
+  redsun now clears the store on revoke and reports a stopped supervisor as an error.
 - In-process hosting verified live on 2026-09-07: redsun commit `0e1b993cc7` adds
   `origin`/`port` to the host-local `remote_control` settings, starts the companion inside
   the managed service when enabled, enrolled and configured (stops on disable/revoke,

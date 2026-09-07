@@ -22,11 +22,12 @@ export function operational(directory: string, origin: string, auth: Authenticat
     control = makeControl(auth, backend, origin)
     const handler = control
     yield* Effect.addFinalizer(() => Effect.sync(() => handler.close()))
-    return (request: Request) => {
+    const handle = (request: Request) => {
       const path = new URL(request.url).pathname
       if (path.startsWith("/control/")) return handler.handle(request)
       if (path === "/diagnostic" || path === "/diagnostic.js") return diagnosticAssets(request)
       return webAssets(request)
     }
+    return { handle, snapshot: backend.snapshot }
   })
 }
