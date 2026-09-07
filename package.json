@@ -1,9 +1,9 @@
 {
-  "name": "redsun-remote-control",
+  "name": "@redsun-remote/workspace",
   "private": true,
   "type": "module",
   "packageManager": "bun@1.4.0",
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": ["apps/*"],
   "scripts": {
     "dev": "bun run apps/companion/src/cli.ts",
     "test": "bun test",

@@ -2,8 +2,8 @@ import { spawn } from "node:child_process"
 import { constants } from "node:fs"
 import { open } from "node:fs/promises"
 import path from "node:path"
-import { fileURLToPath } from "node:url"
 import { Effect } from "effect"
+import { spawnHelper } from "./powershell"
 import { createPrivateFile, ensurePrivateDirectory, readPrivateFile, removePrivateFile, replacePrivateFile, StorageError } from "./private-file"
 
 type Mutation = "create" | "replace" | "remove"
@@ -38,13 +38,9 @@ async function acquire(file: string): Promise<Lease> {
       }
     } catch (error) { await handle.close(); throw error }
   }
-  const root = process.env.SystemRoot ?? process.env.SYSTEMROOT
-  if (process.platform !== "win32" || !root || !path.isAbsolute(root)) throw new StorageError()
+  const child = process.platform === "win32" ? spawnHelper(true) : undefined
+  if (!child) throw new StorageError()
   return new Promise((resolve, reject) => {
-    const child = spawn(path.join(root, "System32/WindowsPowerShell/v1.0/powershell.exe"), [
-      "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-      fileURLToPath(new URL("./private-file.ps1", import.meta.url)), "-Lock",
-    ], { windowsHide: true, stdio: ["pipe", "pipe", "ignore"] })
     let output = ""
     let ready = false
     let pending: { readonly resolve: () => void; readonly reject: () => void; readonly timer: ReturnType<typeof setTimeout> } | undefined

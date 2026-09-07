@@ -22,27 +22,30 @@ export function dataDirectory(
   throw new StorageError()
 }
 
-function decode(bytes: Uint8Array) {
+function parse(bytes: Uint8Array) {
   return Effect.try({
-    try: () => {
-      const value: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes))
-      return decodeHandoff(value)
-    },
+    try: (): unknown => JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)),
     catch: () => new StorageError(),
   })
 }
 
 export function loadBackend(directory: string) {
-  return readPrivateFile(path.join(directory, "backend.json")).pipe(Effect.flatMap(decode))
+  return readPrivateFile(path.join(directory, "backend.json")).pipe(
+    Effect.flatMap(parse),
+    Effect.flatMap((value) => Effect.try({ try: () => decodeHandoff(value), catch: () => new StorageError() })),
+  )
 }
 
-export function importBackend(source: string, directory: string) {
+export function storeHandoff(value: unknown, directory: string) {
   return Effect.gen(function* () {
-    const bytes = yield* readPrivateFile(source)
-    const enrollment = yield* decode(bytes)
+    const enrollment = yield* Effect.try({ try: () => decodeHandoff(value), catch: () => new StorageError() })
     yield* ensurePrivateDirectory(directory)
     const handoff = Redacted.value(enrollment)
     yield* createPrivateFile(path.join(directory, "backend.json"), Buffer.from(JSON.stringify(handoff)))
     return { backendID: handoff.backendID }
   }).pipe(Effect.uninterruptible)
+}
+
+export function importBackend(source: string, directory: string) {
+  return readPrivateFile(source).pipe(Effect.flatMap(parse), Effect.flatMap((value) => storeHandoff(value, directory)))
 }

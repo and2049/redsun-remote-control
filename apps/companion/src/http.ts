@@ -1,4 +1,8 @@
-import type { Health } from "@redsun-remote/protocol"
+export type Health = {
+  readonly service: "redsun-remote-control"
+  readonly protocolVersion: 1
+  readonly stage: "foundation"
+}
 
 export function handleRequest(request: Request): Response {
   const headers = {

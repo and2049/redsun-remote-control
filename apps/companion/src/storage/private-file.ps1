@@ -1,4 +1,4 @@
-param([switch] $Lock)
+$Lock = $env:REDSUN_PRIVATE_FILE_LOCK -eq '1'
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 

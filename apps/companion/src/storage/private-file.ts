@@ -1,10 +1,9 @@
-import { spawn } from "node:child_process"
 import { constants } from "node:fs"
 import { link, lstat, mkdir, open, rename, unlink } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
 import path from "node:path"
-import { fileURLToPath } from "node:url"
 import { Effect } from "effect"
+import { spawnHelper } from "./powershell"
 
 export class StorageError extends Error {
   constructor() {
@@ -16,13 +15,9 @@ export class StorageError extends Error {
 const limit = 16 * 1024
 
 function windows(action: string, file: string, content?: string): Promise<Buffer> {
-  const root = process.env.SystemRoot ?? process.env.SYSTEMROOT
-  if (!root || !path.isAbsolute(root)) return Promise.reject(new StorageError())
+  const child = spawnHelper()
+  if (!child) return Promise.reject(new StorageError())
   return new Promise((resolve, reject) => {
-    const child = spawn(path.join(root, "System32/WindowsPowerShell/v1.0/powershell.exe"), [
-      "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-      "-File", fileURLToPath(new URL("./private-file.ps1", import.meta.url)),
-    ], { windowsHide: true, stdio: ["pipe", "pipe", "ignore"] })
     const chunks: Buffer[] = []
     let size = 0
     const timer = setTimeout(() => { child.kill(); reject(new StorageError()) }, 15_000)

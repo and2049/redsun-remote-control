@@ -1,6 +1,6 @@
-import { fileURLToPath } from "node:url"
 import { Effect } from "effect"
 import { assets } from "./assets"
+import { embedded } from "./embedded"
 
 const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Redsun diagnostic</title>
 <body><h1>Redsun phone diagnostic</h1><p>Private trusted-owner control. Directory selection may load host plugins. This is not a filesystem sandbox.</p>
@@ -15,13 +15,8 @@ const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="v
 <pre id="output"></pre><script src="/diagnostic.js" defer></script></body></html>`
 
 export function diagnostic(origin: string) {
-  return Effect.tryPromise(async () => {
-    const build = await Bun.build({ entrypoints: [fileURLToPath(new URL("./diagnostic-browser.ts", import.meta.url))], target: "browser" })
-    if (!build.success || !build.outputs[0]) throw new Error("Diagnostic build failed")
-    const script = await build.outputs[0].text()
-    return assets(origin, "default-src 'none'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'", {
-      "/diagnostic": { body: html, type: "text/html; charset=utf-8" },
-      "/diagnostic.js": { body: script, type: "text/javascript; charset=utf-8" },
-    })
-  })
+  return embedded.pipe(Effect.map((built) => assets(origin, "default-src 'none'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'", {
+    "/diagnostic": { body: html, type: "text/html; charset=utf-8" },
+    "/diagnostic.js": { body: built.diagnostic.script, type: "text/javascript; charset=utf-8" },
+  })))
 }

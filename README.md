@@ -54,9 +54,13 @@ verification run before deployment.
   handoff import, serialized credential counter updates, and local browser recovery.
   Explicit `serve --backend` adds scoped events, passive reconnection, remote operations
   and diagnostic assets. No credentials are loaded by no-argument development mode.
-- `apps/web`: reserved browser application boundary, pending upstream UI audit.
-- `packages/protocol`: browser-safe companion contracts.
+- `apps/web`: the React browser application, bundled into the companion.
 - `.redsun/memory.md`: live progress, architecture decisions, and open questions.
+
+`apps/companion` is also the publishable `redsun-remote-control` npm package that
+redsun depends on for `redsun remote companion` and in-process TUI enrollment. See
+[packaging](docs/packaging.md) for the build, the embedded assets and the
+programmatic API.
 
 See [authentication backend operation and HTTP contract](docs/authentication.md)
 for the explicit authenticated serve mode, local approval/recovery commands, security

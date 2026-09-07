@@ -5,3 +5,5 @@ coverage/
 .env.*
 *.log
 *.tsbuildinfo
+
+apps/companion/src/generated/assets.ts

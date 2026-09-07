@@ -23,8 +23,9 @@ with no commit-body description. Do not include unrelated user work.
 
 ## Implemented foundation
 
-- Bun workspace with `apps/companion`, `packages/protocol` and `apps/web`, the React
-  browser client described in the web app section below.
+- Bun workspace with `apps/companion` (the publishable `redsun-remote-control` npm
+  package, see the packaging section) and `apps/web`, the React browser client
+  described in the web app section below.
 - Strict TypeScript configuration and Bun tests.
 - Effect-scoped Bun listener, hard-bound to IPv4 loopback. Development uses an
   ephemeral port; authenticated serve mode requires explicit HTTPS origin/port.
@@ -523,6 +524,40 @@ screen have not been exercised live yet; the diagnostic remains available for th
 The Chrome extension dropped some physical clicks during the check; that was tooling,
 not an app defect (programmatic clicks behaved).
 
+### npm packaging and redsun integration
+
+- `apps/companion` is published as `redsun-remote-control` (version 0.1.0, license
+  field MIT pending the user's confirmation; no LICENSE file exists yet). The root
+  workspace package is `@redsun-remote/workspace`; `packages/protocol` was folded into
+  `src/http.ts`. Publishing is user-run: push a `v<version>` tag and the `Publish`
+  workflow builds, tests and runs `npm publish --provenance` via npm trusted
+  publishing, or run `npm publish` from `apps/companion` for the first release.
+- `bun run build` in `apps/companion` writes the web app and diagnostic bundles to the
+  gitignored `src/generated/assets.ts`, bundles `src/index.ts` and `src/cli.ts` for
+  Bun with node_modules external, and emits declarations. `src/embedded.ts` imports the
+  generated module and falls back to building from source when it is absent, so tests
+  and `bun run dev` need no build step; the committed `src/generated/assets.d.ts`
+  keeps the import typechecking. Runtime `Bun.build` at startup is gone because
+  redsun's compiled binary has no sources.
+- The Windows helper is embedded: `src/storage/powershell.ts` imports
+  `private-file.ps1` as text and launches PowerShell with `-EncodedCommand`; lock mode
+  is selected with `REDSUN_PRIVATE_FILE_LOCK=1` instead of a script parameter.
+- Programmatic API in `src/index.ts`: `main(args, { signal, name })` (full CLI, usage
+  text under the host's command name), `serveCompanion`, `importHandoff` (in-process
+  enrollment that validates the v1 handoff and creates `backend.json`, never
+  overwriting), `importHandoffFile`, `checkBackend`, `recoverBrowser`,
+  `dataDirectory`, `parseCommand`, `validateServe`, `StorageError`, `Health`.
+  Programmatic errors surface their own messages rather than Effect's generic
+  `Effect.try` wrapper.
+- redsun side (feature branch `feat/remote-control-integration`): the TUI `/remote`
+  dialog was redesigned per `.redsun/plans/remote-control-host-ux.md` (dynamic
+  options, coloured state, per-state guidance, in-dialog enrollment). The follow-up
+  wires `redsun remote companion ...` to `main` and switches TUI enrollment to
+  `importHandoff` with exact `redsun remote companion serve` and `tailscale serve`
+  commands plus Tailscale docs links in the dialog. Tailscale itself stays manual.
+  Until 0.1.0 is published, redsun's `bun install --frozen-lockfile` cannot resolve
+  the pin; publish first, then refresh redsun's lockfile.
+
 ### Protected local backend import implementation
 
 `storage/private-file.ts` and its Windows PowerShell helper implement bounded
@@ -687,7 +722,9 @@ and cancellation of stalled requests on scope release. Phone-test helper tests c
 origin/certificate/Serve-state parsing, pending approval lines and option parsing. The
 web app tests cover pure state/timeline/attachment helpers and static rendering of
 the timeline, approvals and markdown. The full suite now makes 872 assertions across
-30 files (273 tests) on Windows.
+31 files (276 tests) on Windows. Packaging tests cover in-process handoff import,
+programmatic serve validation and embedded CLI usage; `bun run build` in
+`apps/companion` plus `npm pack --dry-run` verify the publishable output.
 Redsun verification run separately from its core directory:
 `bun run test ../server/test/remote-control.test.ts ../server/test/remote-admission.test.ts ../server/test/remote-projection.test.ts`
 passed 8 tests / 145 assertions. These use its isolated test harness, not the installed

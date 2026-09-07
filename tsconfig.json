@@ -13,5 +13,5 @@
     "skipLibCheck": true,
     "jsx": "react-jsx"
   },
-  "include": ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts"]
+  "include": ["apps/**/*.ts", "apps/**/*.tsx"]
 }
