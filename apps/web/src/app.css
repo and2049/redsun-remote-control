@@ -122,20 +122,27 @@ a { color: var(--link); }
 .chat { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
 .floating-header {
   display: grid; grid-template-columns: 2.5rem 1fr 2.5rem; align-items: center; gap: 0.5rem;
-  padding: calc(0.5rem + var(--safe-top)) 0.75rem 1.5rem;
+  padding: calc(0.5rem + var(--safe-top)) 0.75rem 2rem;
   position: absolute; top: 0; left: 0; right: 0; z-index: 2;
-  background: linear-gradient(to bottom, var(--header-surface, var(--surface)) 0%, color-mix(in srgb, var(--header-surface, var(--surface)) 75%, transparent) 55%, transparent 100%);
-  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  mask-image: linear-gradient(to bottom, black 55%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
   pointer-events: none;
 }
 .floating-header > * { pointer-events: auto; }
+.floating-header::before, .floating-header::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.floating-header::before {
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  mask-image: linear-gradient(to bottom, black 45%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 45%, transparent 100%);
+}
+.floating-header::after {
+  backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--header-surface, var(--surface)) 72%, transparent) 0%, color-mix(in srgb, var(--header-surface, var(--surface)) 40%, transparent) 55%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 30%, transparent 85%); -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent 85%);
+}
 .chat-header .heading { text-align: center; min-width: 0; }
 .chat-header .heading strong { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-header .heading small { display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-tertiary); }
 
 .transcript { flex: 1; overflow-y: auto; overscroll-behavior: contain; scroll-behavior: smooth; }
-.transcript-column { max-width: var(--column); margin: 0 auto; padding: calc(4rem + var(--safe-top)) 1.25rem 1rem; }
+.transcript-column { max-width: var(--column); margin: 0 auto; padding: calc(4.25rem + var(--safe-top)) 1.25rem 1rem; }
 
 .composer-dock { position: relative; padding: 0 0.75rem calc(0.75rem + var(--safe-bottom)); background: linear-gradient(to bottom, transparent, var(--surface) 30%); }
 .composer-column { max-width: var(--column); margin: 0 auto; display: grid; gap: 0.5rem; }
@@ -168,7 +175,7 @@ a { color: var(--link); }
   .session-row.selected { background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--border); }
   .sheet-backdrop { align-items: center; }
   .sheet { border-radius: var(--radius-bubble); padding-bottom: 1.25rem; }
-  .chat-header { grid-template-columns: 1fr auto; padding: 0.75rem 1.25rem 1.5rem; }
+  .chat-header { grid-template-columns: 1fr auto; padding: 0.75rem 1.25rem 2rem; }
   .chat-header .back { display: none; }
   .chat-header .heading { text-align: left; }
 }
