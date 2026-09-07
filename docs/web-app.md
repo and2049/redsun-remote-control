@@ -12,7 +12,14 @@ Mobile (below 48rem) uses stack navigation like a chat app: the session list is 
 screen, opening a session shows the chat with a back button, and sheets slide up from the
 bottom. Desktop shows the session list as a sidebar next to the chat. Safe-area insets
 are respected for notched phones. Prose uses a serif stack, chrome uses the system sans
-stack, code uses monospace. Colors follow the light and dark schemes automatically.
+stack, code uses monospace. Colors come from the host: the client fetches the resolved
+redsun TUI theme through the scoped `GET /api/remote/theme` route after connecting and
+about once a minute, maps its tokens onto the stylesheet's custom properties (surface,
+ink, border, accent, feedback colors, link and heading colors) and sets `color-scheme`
+from the theme's mode. The browser's own light or dark preference is not consulted. The
+last theme is cached in localStorage and applied at startup to avoid a flash; until a
+theme has ever loaded, neutral light defaults from the stylesheet apply. Secondary
+tokens (tertiary ink, strong border, soft accent) are derived with `color-mix`.
 
 ## Authentication
 

@@ -237,7 +237,8 @@ uncertain prompt submissions. Disconnecting a browser must not cancel execution.
 
 ### Finalized redsun RC contract
 
-Pinned redsun commit: `fa65c5f530e78509e53793a608e4a0654996b21e`
+Pinned redsun commit: `73478ccdfd` (`feat: expose resolved host theme to remote control`,
+feature branch, 2026-09-07) on top of `fa65c5f530e78509e53793a608e4a0654996b21e`
 (`feat: add managed remote-control integration foundations`). Canonical handoff is
 redsun's `specs/remote-control-integration.md`. Reviewed it alongside schemas,
 authorization, status handlers, persistence, registration, and export code.
@@ -474,6 +475,24 @@ agent runs use the backend's default delivery (queued); steer is not exposed yet
 newest 200 messages are shown without pagination, and because the scoped stream has no
 token deltas, assistant text appears at refresh cadence rather than streaming.
 
+Host theme (2026-09-07, user request): the web app matches the host's redsun TUI theme
+and no longer consults the browser's light/dark preference. Redsun gained scoped
+`GET /api/remote/theme` (v1 table, no query) returning `{name, mode, colors}` with hex
+colors resolved from the TUI's persisted selection in global `cli.json` (fallback `dusk`)
+plus global `themes/*.json`; project `.redsun/themes` and plugin-installed themes are not
+consulted. The built-in theme assets moved from the TUI package into `packages/theme` so
+the server does not depend on the TUI. The companion allowlists the read; `apps/web/src/theme.ts`
+maps tokens to the stylesheet custom properties, sets `color-scheme` from the mode, caches
+the last theme in localStorage, and the app refetches it on connect and every 60 s.
+Derived tokens use `color-mix`. The host currently has no theme configured, so it reports
+`dusk` (dark, yellow primary). Live phone verification of the theme is the user's next step.
+
+Restart procedure while the user works remotely: after companion changes, stop the running
+`serve --backend` process tree and start it detached (PowerShell `Start-Process`, hidden,
+logs in `%TEMP%edsun-companion.log`) with the same origin/port the phone-test run used;
+after redsun backend changes, `bun src/index.ts service restart` from `packages/cli`, which
+signs the phone out once through supervisor invalidation. Never commit the private origin.
+
 Verification on 2026-09-07 used a throwaway mock harness (scratchpad only, not in the
 repository) rendering the bundle in Chrome for desktop and a 390px phone frame: session
 list, transcript with markdown/tables/code/tool groups, queued inbox bubble, permission
@@ -648,7 +667,7 @@ and cancellation of stalled requests on scope release. Phone-test helper tests c
 origin/certificate/Serve-state parsing, pending approval lines and option parsing. The
 web app tests cover pure state/timeline/attachment helpers and static rendering of
 the timeline, approvals and markdown. The full suite now makes 872 assertions across
-28 files (266 tests) on Windows.
+29 files (270 tests) on Windows.
 Redsun verification run separately from its core directory:
 `bun run test ../server/test/remote-control.test.ts ../server/test/remote-admission.test.ts ../server/test/remote-projection.test.ts`
 passed 8 tests / 145 assertions. These use its isolated test harness, not the installed

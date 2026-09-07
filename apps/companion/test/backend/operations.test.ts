@@ -6,6 +6,7 @@ import { status } from "./fixture"
 test.each([
   { method: "GET", path: "/api/session", query: { cursor: "opaque", limit: "20" } },
   { method: "GET", path: "/api/location", query: { "location[directory]": "C:\\work" } },
+  { method: "GET", path: "/api/remote/theme" },
   { method: "POST", path: "/api/session", body: { id: "ses_example", location: { directory: "C:\\work" } } },
   { method: "POST", path: "/api/session/ses_example/prompt", body: { id: "msg_example", text: "hello", delivery: "queue", files: [{ uri: "data:text/plain;base64,YQ==" }] } },
   { method: "POST", path: "/api/session/ses_example/permission/per_example/reply", body: { reply: "once" } },
@@ -17,6 +18,7 @@ test.each([
   { method: "GET", path: "/api/remote" },
   { method: "GET", path: "/api/event" },
   { method: "GET", path: "/api/config" },
+  { method: "GET", path: "/api/remote/theme", query: { "location[directory]": "C:\\work" } },
   { method: "POST", path: "/api/remote/heartbeat", body: { connected: true } },
   { method: "DELETE", path: "/api/session/ses_example" },
   { method: "GET", path: "http://127.0.0.1/api/session" },

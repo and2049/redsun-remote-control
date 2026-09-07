@@ -85,3 +85,18 @@ export type SessionSnapshot = {
   forms: Form[]
   running: boolean
 }
+
+type Hex = string
+type Feedback = { error: Hex; warning: Hex; success: Hex; info: Hex }
+type Actions = { primary: Hex; secondary: Hex; destructive: Hex }
+export type Theme = {
+  name: string
+  mode: "light" | "dark"
+  colors: {
+    text: { default: Hex; subdued: Hex; action: Actions; status: { running: Hex; question: Hex; permission: Hex; unread: Hex }; feedback: Feedback }
+    background: { default: Hex; offset: Hex; overlay: Hex; action: Actions; feedback: Feedback }
+    border: { default: Hex }
+    diff: { added: Hex; removed: Hex }
+    markdown: Record<"text" | "heading" | "link" | "linkText" | "code" | "blockQuote" | "emphasis" | "strong" | "horizontalRule" | "listItem" | "listEnumeration" | "image" | "imageText" | "codeBlock", Hex>
+  }
+}

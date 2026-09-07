@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { api, ApiError, auth, type RefreshFrame } from "./api"
 import { useConnection } from "./connection"
 import { makeScheduler, type RefreshResult, type Scheduler } from "./refresh"
+import { applyTheme, rememberTheme, restoreTheme } from "./theme"
 import { containsPrompt, creatingKey, newID, pendingPromptKey, readPending } from "./state"
 import type { ActiveSessions, AgentChoice, Attachment, FormValue, Location, ModelChoice, ModelRef, PromptBody, Session, SessionSnapshot } from "./types"
 import { Auth } from "./views/Auth"
@@ -16,6 +17,7 @@ type CatalogState = { agents: AgentChoice[]; models: ModelChoice[]; loading: boo
 const backstopMs = 30_000
 const refreshIntervalMs = 4000
 const throttleRetryMs = 2000
+const themeIntervalMs = 60_000
 
 async function loadSnapshot(id: string, listed: Session | undefined, running: boolean, background: boolean): Promise<SessionSnapshot> {
   const [session, messages, inbox, permissions, forms] = await Promise.all([
@@ -48,6 +50,7 @@ export function App() {
   const revisionRef = useRef(-1)
   const lastRefreshRef = useRef(0)
   const schedulerRef = useRef<Scheduler | undefined>(undefined)
+  const themeAtRef = useRef(0)
 
   const report = useCallback((failure: unknown) => {
     if (failure instanceof ApiError && failure.status === 401) {
@@ -64,8 +67,18 @@ export function App() {
   }, [toast])
 
   useEffect(() => {
+    const cached = restoreTheme()
+    if (cached) applyTheme(cached)
     auth.signedIn().then((signedIn) => setPhase(signedIn ? "signed-in" : "signed-out")).catch(report)
   }, [report])
+
+  const syncTheme = useCallback(() => {
+    themeAtRef.current = Date.now()
+    api.theme().then((theme) => {
+      applyTheme(theme)
+      rememberTheme(theme)
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (phase !== "signed-out") return
@@ -136,7 +149,8 @@ export function App() {
     const changed = frame.revision !== revisionRef.current
     revisionRef.current = frame.revision
     if (changed || Date.now() - lastRefreshRef.current > backstopMs) void refresh(true)
-  }, [refresh, select])
+    if (Date.now() - themeAtRef.current > themeIntervalMs) syncTheme()
+  }, [refresh, select, syncTheme])
 
   const connection = useConnection(phase === "signed-in", onFrame, () => setPhase("signed-out"))
 

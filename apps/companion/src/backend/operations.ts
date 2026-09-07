@@ -24,7 +24,7 @@ const mutations: ReadonlyArray<readonly [RegExp, Schema.ConstraintDecoder<unknow
 ]
 const emptyMutation = /^\/api\/session\/ses_[A-Za-z0-9_-]+\/(interrupt|form\/frm_[A-Za-z0-9_-]+\/cancel)$/
 const reads = [
-  /^\/api\/(location|session|session\/active|remote\/(agent|model))$/,
+  /^\/api\/(location|session|session\/active|remote\/(agent|model|theme))$/,
   /^\/api\/session\/ses_[A-Za-z0-9_-]+$/,
   /^\/api\/session\/ses_[A-Za-z0-9_-]+\/(message|inbox|permission|form)$/,
   /^\/api\/session\/ses_[A-Za-z0-9_-]+\/message\/msg_[A-Za-z0-9_-]+$/,

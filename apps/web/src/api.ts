@@ -1,6 +1,6 @@
 import type {
   ActiveSessions, AgentChoice, Catalog, Delivery, Form, FormValue, InboxItem, Location, Message, ModelChoice, ModelRef, Page, Permission,
-  PromptBody, Session,
+  PromptBody, Session, Theme,
 } from "./types"
 
 export class ApiError extends Error {
@@ -109,6 +109,7 @@ export const api = {
   agents: (location?: Location) => call<Catalog<AgentChoice>>("GET", "/api/remote/agent", { query: locationQuery(location) }),
   models: (location?: Location) => call<Catalog<ModelChoice>>("GET", "/api/remote/model", { query: locationQuery(location) }),
   location: (directory: string) => call<Location>("GET", "/api/location", { query: locationQuery({ directory }) }),
+  theme: () => call<Theme>("GET", "/api/remote/theme", { background: true }),
   create: (body: { id: string; title?: string; agent?: string; model?: ModelRef; location?: Location }) =>
     call<{ data: Session }>("POST", "/api/session", { body }),
   prompt: (id: string, body: PromptBody) => call<unknown>("POST", `/api/session/${id}/prompt`, { body }),
