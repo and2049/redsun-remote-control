@@ -1,0 +1,92 @@
+.timeline { display: grid; gap: 1.25rem; min-width: 0; }
+.user-entry { display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; min-width: 0; }
+.user-bubble { max-width: 85%; padding: 0.7rem 1rem; border-radius: var(--radius-bubble); background: var(--user-bubble); white-space: pre-wrap; overflow-wrap: anywhere; }
+.bubble-caption { color: var(--ink-tertiary); font-size: 0.75rem; padding-right: 0.5rem; }
+.prose { min-width: 0; max-width: var(--column); font-family: var(--font-prose); line-height: var(--leading); overflow-wrap: anywhere; }
+.prose > :first-child { margin-top: 0; }
+.prose > :last-child { margin-bottom: 0; }
+.prose p { margin: 0.75rem 0; }
+.prose h1, .prose h2, .prose h3 { line-height: 1.3; margin: 1.25rem 0 0.6rem; }
+.prose h1 { font-size: 1.7rem; }
+.prose h2 { font-size: 1.4rem; }
+.prose h3 { font-size: 1.15rem; }
+.prose code, .shell-entry code, .tool-output pre, .tool-subject, .approval-resources code { font-family: var(--font-mono); font-size: 0.8125rem; }
+.prose code { background: var(--code-bg); padding: 0.1rem 0.25rem; border-radius: 0.2rem; }
+.prose .code { background: var(--code-bg); border-radius: var(--radius); padding: 1rem; overflow-x: auto; white-space: pre; }
+.prose .code > code { padding: 0; border-radius: 0; }
+.prose blockquote { border-left: 3px solid var(--border-strong); margin-left: 0; padding-left: 1rem; color: var(--ink-secondary); }
+.prose-table { max-width: 100%; overflow-x: auto; margin: 1rem 0; }
+.prose-table table { border-collapse: collapse; min-width: 100%; }
+.prose-table th, .prose-table td { border: 1px solid var(--border); padding: 0.4rem 0.65rem; text-align: left; }
+.markdown-image { color: var(--ink-secondary); font-style: italic; }
+.reasoning, .work-group { min-width: 0; color: var(--ink-secondary); font-size: 0.875rem; }
+.reasoning summary, .work-group summary, .tool-output summary { cursor: pointer; }
+.reasoning > div { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 0.5rem; }
+.work-group > summary { list-style: none; }
+.work-group > summary::-webkit-details-marker { display: none; }
+.work-group > summary::before { content: ""; display: inline-block; width: 0.4rem; height: 0.4rem; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(-45deg); margin: 0 0.65rem 0.1rem 0.1rem; }
+.work-group[open] > summary::before { transform: rotate(45deg); }
+.tool-row { padding: 0.65rem 0 0.65rem 0.9rem; border-left: 1px solid var(--border); margin-top: 0.5rem; min-width: 0; }
+.tool-heading { display: flex; gap: 0.5rem; align-items: center; min-width: 0; }
+.tool-heading > span { flex-shrink: 0; }
+.tool-subject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-tertiary); }
+.tool-output { margin-top: 0.5rem; min-width: 0; }
+.tool-output pre { background: var(--code-bg); padding: 0.75rem; border-radius: var(--radius); max-height: 20rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tool-output button { color: var(--accent); padding: 0.35rem 0; }
+.shell-entry { min-width: 0; overflow-wrap: anywhere; }
+.shell-entry > code { white-space: pre-wrap; }
+.switch-entry { text-align: center; color: var(--ink-tertiary); font-size: 0.75rem; }
+.switch-entry > span { display: inline-block; max-width: 100%; border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 0.2rem 0.65rem; overflow-wrap: anywhere; }
+.timeline-note { color: var(--ink-tertiary); font-size: 0.8125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.component-error { color: var(--danger); font: 0.8125rem var(--font-ui); overflow-wrap: anywhere; padding: 0.35rem 0; }
+.running-indicator { display: flex; align-items: center; gap: 0.3rem; height: 1.5rem; }
+.pulse-dot { display: inline-block; width: 0.35rem; height: 0.35rem; border-radius: 50%; background: var(--ink-tertiary); animation: component-pulse 1.5s ease-in-out infinite; }
+.running-indicator > :nth-child(2) { animation-delay: 0.2s; }
+.running-indicator > :nth-child(3) { animation-delay: 0.4s; }
+@keyframes component-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+.composer-card, .approval-card { min-width: 0; background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius-bubble); box-shadow: 0 3px 14px color-mix(in srgb, var(--ink) 6%, transparent); padding: 0.75rem; }
+.composer-card > textarea { display: block; width: 100%; min-height: 1.625em; max-height: 13em; resize: none; border: 0; background: transparent; padding: 0; line-height: 1.625; overflow-y: auto; outline-offset: 3px; }
+.composer-card > textarea::placeholder { color: var(--ink-tertiary); }
+.composer-toolbar { display: flex; align-items: center; gap: 0.35rem; margin-top: 0.7rem; min-width: 0; }
+.composer-round { display: inline-flex; flex-shrink: 0; justify-content: center; align-items: center; width: 2.5rem; height: 2.5rem; border: 1px solid var(--border); border-radius: 50%; }
+.composer-round:hover { border-color: var(--border-strong); }
+.composer-send { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.composer-pill { padding: 0.35rem 0.5rem; border-radius: var(--radius-pill); background: var(--surface-sunken); color: var(--ink-secondary); font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 28%; }
+.composer-model { flex: 0 1 auto; }
+.composer-actions { margin-left: auto; display: flex; gap: 0.35rem; flex-shrink: 0; }
+.attachment-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
+.attachment-chip { display: flex; align-items: center; gap: 0.4rem; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.3rem; font-size: 0.75rem; max-width: 100%; }
+.attachment-chip > img { width: 2.5rem; height: 2.5rem; object-fit: cover; border-radius: 0.25rem; }
+.attachment-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachment-chip > button { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 2rem; height: 2rem; }
+.approval-card h2 { font-size: 1rem; margin: 0 0 0.65rem; overflow-wrap: anywhere; }
+.approval-card p { font-size: 0.875rem; overflow-wrap: anywhere; }
+.approval-counter { font-size: 0.75rem; color: var(--ink-tertiary); margin-bottom: 0.35rem; }
+.approval-resources { list-style: none; padding: 0; margin: 0.5rem 0; overflow-wrap: anywhere; }
+.approval-choices { display: grid; gap: 0.4rem; }
+.approval-choice { text-align: left; display: grid; padding: 0.65rem 0.8rem; background: var(--surface-sunken); border: 1px solid var(--border); border-radius: var(--radius); }
+.approval-choice strong { font-size: 0.875rem; font-weight: 500; }
+.approval-choice span { font-size: 0.75rem; color: var(--ink-secondary); }
+.approval-choice.primary { color: var(--accent); background: var(--accent-soft); }
+.approval-choice.danger { color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--surface-raised)); }
+.approval-fields { border: 0; padding: 0; margin: 0; display: grid; gap: 0.75rem; min-width: 0; }
+.approval-field, .approval-field > label { display: grid; gap: 0.3rem; min-width: 0; font-size: 0.875rem; }
+.approval-field input, .approval-field select { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 0.5rem 0.65rem; font-size: 1rem; }
+.approval-field small, .approval-checkbox small, .approval-multiselect p { display: block; font-size: 0.75rem; color: var(--ink-secondary); }
+.approval-checkbox { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.875rem; padding: 0.35rem 0; }
+.approval-checkbox input { accent-color: var(--accent); margin-top: 0.35rem; }
+.approval-multiselect { border: 1px solid var(--border); border-radius: var(--radius); min-width: 0; }
+.approval-multiselect legend { font-size: 0.875rem; }
+.approval-actions { display: flex; gap: 0.5rem; margin-top: 0.85rem; }
+.approval-primary, .approval-secondary { padding: 0.5rem 1rem; border-radius: var(--radius); }
+.approval-primary { background: var(--accent); color: var(--accent-ink); }
+.approval-secondary { background: var(--surface-sunken); border: 1px solid var(--border); }
+@media (min-width: 48rem) {
+  .timeline { gap: 1.5rem; }
+  .composer-card, .approval-card { padding: 1rem; }
+  .composer-pill { font-size: 0.8125rem; padding-inline: 0.75rem; }
+  .composer-toolbar { gap: 0.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot { animation: none; }
+}

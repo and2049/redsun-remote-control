@@ -87,10 +87,13 @@ test.each([false, true])("CLI authentication, recovery and optional operational 
     const cookie = loggedIn.headers.get("set-cookie")?.split(";")[0] ?? ""
     expect((await post("/auth/session", cookie)).status).toBe(200)
     if (remote) {
-      const page = await fetch(`http://127.0.0.1:${port}/`, { headers: { Host: new URL(origin).host } })
+      const page = await fetch(`http://127.0.0.1:${port}/diagnostic`, { headers: { Host: new URL(origin).host } })
       expect(page.status).toBe(200)
       expect(await page.text()).toContain("Redsun phone diagnostic")
       expect(page.headers.get("content-security-policy")).toContain("frame-ancestors 'none'")
+      const product = await fetch(`http://127.0.0.1:${port}/`, { headers: { Host: new URL(origin).host } })
+      expect(product.status).toBe(200)
+      expect(await product.text()).toContain("<title>Redsun</title>")
       expect((await post("/control/request", "", { method: "GET", path: "/api/session" })).status).toBe(401)
       expect((await post("/control/request", cookie, { method: "GET", path: "/api/config" })).status).toBe(400)
       expect(await (await post("/control/request", cookie, { method: "GET", path: "/api/session" })).json()).toEqual({ data: [] })

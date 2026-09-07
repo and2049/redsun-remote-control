@@ -2,6 +2,8 @@
 
 The companion now has an explicit diagnostic mode with passkey authentication,
 allowlisted remote operations, scoped backend events and browser-stream revocation.
+In `serve --backend` mode, the product web app is served at `/` and the diagnostic
+page remains available at `/diagnostic`.
 Its end-to-end CLI tests use signed authenticator fixtures and a synthetic redsun
 HTTP/SSE server. On 2026-09-06 an iPhone using Safari connected through Tailscale Serve,
 registered a passkey, received local fingerprint approval, logged in and reached
@@ -80,7 +82,7 @@ browser Origin. The companion intentionally rejects mismatches.
 
 ## Phone sequence
 
-1. Connect the phone to the same tailnet and open the selected HTTPS origin. A modern
+1. Connect the phone to the same tailnet and open `/diagnostic` at the selected HTTPS origin. A modern
    browser supporting WebAuthn JSON helpers (`parseCreationOptionsFromJSON`,
    `parseRequestOptionsFromJSON`, and credential `toJSON`) is required by this testing
    page. Unsupported browsers receive a diagnostic error; no insecure login fallback
