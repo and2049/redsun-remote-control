@@ -3,8 +3,10 @@
 The companion now has an explicit diagnostic mode with passkey authentication,
 allowlisted remote operations, scoped backend events and browser-stream revocation.
 Its end-to-end CLI tests use signed authenticator fixtures and a synthetic redsun
-HTTP/SSE server. This is not yet verified against a real redsun process or a phone.
-Do not treat passing fixture tests as live deployment certification.
+HTTP/SSE server. On 2026-09-06 an iPhone using Safari connected through Tailscale Serve,
+registered a passkey, received local fingerprint approval, logged in and reached
+"Connected to backend" against the local source redsun service on Windows. This
+verifies connection and authentication, not every operation or deployment platform.
 
 ## Preflight requiring local authorization
 
@@ -25,7 +27,8 @@ Do not treat passing fixture tests as live deployment certification.
    cannot exist and passkeys cannot work. Approve the exact private Serve configuration
    locally. Never use Funnel or a public listener.
 
-The next live integration step still needs these approvals and environment checks.
+New deployments and additional live policy/service changes still need these approvals
+and environment checks; the first phone connection has completed this preflight.
 No machine-specific settings, handoffs or private hostnames belong in this repository.
 
 ## Automated host-side run
@@ -81,7 +84,7 @@ browser Origin. The companion intentionally rejects mismatches.
    browser supporting WebAuthn JSON helpers (`parseCreationOptionsFromJSON`,
    `parseRequestOptionsFromJSON`, and credential `toJSON`) is required by this testing
    page. Unsupported browsers receive a diagnostic error; no insecure login fallback
-   exists. Actual phone/browser support remains unverified.
+   exists. This flow has worked on iPhone Safari; broader browser support is unverified.
 2. At local companion stdin enter `enroll`. On the phone choose **Register passkey**.
 3. Compare the complete fingerprint displayed on the phone with local `pending`.
    Enter `approve <requestID> <fingerprint>` locally only for that exact request.
@@ -155,9 +158,14 @@ uses a restrictive CSP, and contains no third-party script or frontend dependenc
 
 ## Remaining verification
 
-Real-redsun process integration, actual discovery ACL compatibility, browser WebAuthn
-execution, Tailscale Host handling, phone connectivity and Ubuntu runtime validation
-remain unverified. The diagnostic is suitable for controlled preflight work, not an
-assertion that these deployment checks have passed. The full product UI, automatic
-service installation, optional handoff-source deletion and richer uncertain-write
-reconciliation remain separate work.
+The first connection verified real Windows discovery ACLs, scoped attachment,
+Tailscale Host/Origin preservation and Safari WebAuthn. Next exercise session creation,
+prompts, history, interruption, moves, models/agents, permissions/forms and reconnect
+with uncertain submissions. Verify logout/recovery/backend disable or revocation close
+authorization without cancelling admitted work. Policy changes need local approval.
+
+Frontend design can proceed against the current scoped APIs. Background companion
+operation and local enrollment/recovery access need an operational workflow before
+unattended deployment; automatic service installation is not approved scope. Ubuntu
+runtime and wider browser/authenticator coverage remain unverified. Rich uncertain-write
+reconciliation is frontend work, not permission to retry backend mutations blindly.

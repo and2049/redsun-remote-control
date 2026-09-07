@@ -36,8 +36,8 @@ with no commit-body description. Do not include unrelated user work.
   protected credential/counter storage, and authentication HTTP wiring exist.
   Explicit `serve --backend` now mounts protected backend loading, scoped supervision,
   allowlisted operations, browser refresh streams and a dependency-free diagnostic
-  page. Real-redsun, browser and Tailscale deployment are not yet verified; the product
-  UI remains deferred. No Tailscale configuration was changed.
+  page. The first Windows/iPhone connection through Tailscale is verified below;
+  broader operations and deployment coverage remain pending. Product UI is deferred.
 
 Approved dependencies: Effect, TypeScript, Bun types. Initial exact pins match the
 locally inspected redsun toolchain: Effect 4.0.0-rc.112, TypeScript 5.8.2, Bun types
@@ -209,7 +209,7 @@ explicit CLI arguments; no operational configuration-file loader exists yet.
 
 `docs/authentication.md` defines these commands, routes, limits and failure semantics.
 The optional `--backend` extension adds operational attachment and a diagnostic page.
-No real Tailscale/browser test has run.
+The first real Tailscale/iPhone connection is recorded in the phone-test section below.
 
 ## Architecture direction
 
@@ -334,6 +334,10 @@ fresh-process rediscovery, refusal/identity failure, timing validation and shutd
 during a stalled heartbeat. In operational mode it also waits for the first validated
 scoped event before publishing ready, and monitors SSE alongside heartbeats. SSE
 closure, invalid status/identity and authorization refusal invalidate browser access.
+The attachment retains its first backend failure before cancelling sibling requests.
+Supervision uses that original cause rather than a consequent closed/aborted transport:
+temporary operation outages retry; refusal and invalid contracts remain terminal.
+Late requests from an older attachment cannot invalidate a newer connection.
 
 CLI `check-backend` loads protected enrollment/discovery and makes one scoped status
 request with a five-second network deadline. It prints fixed success/failure text,
@@ -386,8 +390,8 @@ UI. `diagnostic.ts` builds its browser TypeScript with Bun at startup and serves
 fixed assets under restrictive CSP/Host checks. The page uses native WebAuthn JSON helpers,
 text-only output rendering, explicit reconnect and subscribe-before-snapshot refresh.
 It has list/create/prompt/history/inbox/interrupt controls plus structured allowlisted
-operations for forms/permissions/moves/catalogs. Modern browser support is required and
-has not been hardware-tested. Uncertain prompt IDs/text are retained in tab sessionStorage,
+operations for forms/permissions/moves/catalogs. Modern browser support is required;
+iPhone Safari was verified in the first phone connection. Uncertain prompt IDs/text are retained in tab sessionStorage,
 scoped by backend and session; reconciliation checks loaded history/inbox pages without
 resending. Uncertain creates retain their session ID. Raw controls and additional history
 pages require manual reconciliation; no polished uncertain-write UX is claimed.
@@ -396,9 +400,9 @@ Operational CLI subprocess tests use real signed passkey fixtures and a syntheti
 HTTP/SSE backend. They verify authorized reads, denied administrative/unauthenticated
 access, diagnostic assets and backend disable revoking cookies/streams. Additional tests
 cover payload allowlisting, malformed events, bounded/redirect-free transport, mutation
-nonretry, concurrency/rate limits and background idle expiry. Real redsun process,
-Tailscale Host preservation, discovery ACL compatibility and browser execution remain
-preflight work; no real service, Tailscale config or live credential was changed.
+nonretry, concurrency/rate limits and background idle expiry. Initial implementation
+used fixtures without changing live services; the subsequent authorized phone run below
+verified real attachment, Tailscale Host preservation, discovery ACLs and browser login.
 
 ### Phone-test automation
 
@@ -492,7 +496,8 @@ was reported by the user; phone-to-host connectivity has not been verified.
    chosen. Focused redsun RC tests pass. Frontend/UI audit remains explicitly deferred.
 3. Local vertical slice: protected attachment, operational supervision, scoped events,
    allowlisted operations and diagnostic browser assets implemented and fixture-tested
-   on Windows. Real-redsun process integration and browser execution remain unverified.
+   on Windows. Real attachment and Safari login are verified; live operation and
+   teardown coverage remain pending.
 4. Security: passkeys, local approval, protected counters, browser sessions, recovery,
    HTTP validation/rate limits and CLI/auth route wiring implemented and tested on
    Windows. Policy/event teardown and control authorization are wired and tested with
@@ -568,7 +573,7 @@ now exposes the tested authentication surface, still without Tailscale deploymen
 
 Run from repository root: `bun install --frozen-lockfile`, `bun run typecheck`,
 `bun test`. Development: `bun run dev` (ephemeral loopback health listener only).
-Current verification: frozen install and typecheck pass; 228 tests, 0 failures,
+Current verification: frozen install and typecheck pass; 239 tests, 0 failures,
 including real WebAuthn registration and signed authentication for three algorithms,
 negative security cases, concurrency, invalidation, listener cleanup, and scoped
 attachment fixtures (redirect refusal, proxy isolation, identity/restart checks,
@@ -589,13 +594,13 @@ Discovery/supervision tests cover protected-file rejection, passive CLI status-o
 requests, heartbeat reporting, fresh-process retry, terminal refusal/identity failures,
 and cancellation of stalled requests on scope release. Phone-test helper tests cover
 origin/certificate/Serve-state parsing, pending approval lines and option parsing. The
-full suite now makes 697 assertions across 22 files (234 tests) on Windows; no
+full suite now makes 715 assertions across 22 files (239 tests) on Windows; no
 additional dependency was installed.
 Redsun verification run separately from its core directory:
 `bun run test ../server/test/remote-control.test.ts ../server/test/remote-admission.test.ts ../server/test/remote-projection.test.ts`
 passed 8 tests / 145 assertions. These use its isolated test harness, not the installed
-service. The companion adapter has not yet been exercised against an actual redsun
-server process; its network tests use isolated Bun fixture servers.
+service. Automated companion network tests use isolated fixture servers; actual redsun
+attachment was separately verified during the first phone connection.
 Graceful CLI signal handling remains unverified end to end on Windows; forced process
 termination/lease release and service-scope listener cleanup are integration-tested.
 A real phone connected to the real local redsun backend on 2026-09-06; see the

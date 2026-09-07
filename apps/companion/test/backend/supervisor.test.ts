@@ -16,6 +16,54 @@ function waitFor(read: () => BackendSnapshot, state: BackendSnapshot["state"]) {
   })
 }
 
+test.each([
+  { events: false, code: 503, reason: "unavailable" },
+  { events: true, code: 503, reason: "unavailable" },
+  { events: false, code: 401, reason: "refused" },
+  { events: true, code: 401, reason: "refused" },
+  { events: true, code: 200, reason: "invalid-contract" },
+])("operation failure retains its retry classification: %j", async ({ events, code, reason }) => {
+  let discoveries = 0
+  const server = createServer((request, response) => {
+    if (request.url === "/api/event") {
+      response.writeHead(200, { "Content-Type": "text/event-stream" })
+      response.write(`data: ${JSON.stringify({ id: "evt_fixture", type: "server.connected", data: {} })}\n\n`)
+      return
+    }
+    response.writeHead(request.url === "/api/session" ? code : 200, { "Content-Type": "application/json" })
+    response.end(request.url === "/api/session" ? "invalid" : JSON.stringify(status))
+  })
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+  const address = server.address()
+  if (!address || typeof address === "string") throw new Error("Invalid fixture address")
+  try {
+    await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+      const supervisor = yield* supervise(decodeHandoff(handoff), {
+        timeoutMs: 200, heartbeatMs: 20, retryMs: 20, connected: () => false,
+        invalidate: Effect.void, ...(events ? { onSync: () => {} } : {}),
+      }, Effect.sync(() => {
+        discoveries += 1
+        return { id: status.processID, version: "fixture", pid: process.pid, url: `http://127.0.0.1:${address.port}` }
+      }))
+      const ready = yield* waitFor(supervisor.snapshot, "ready")
+      const error = yield* supervisor.request({ method: "GET", path: "/api/session" }, new AbortController().signal, 1024).pipe(Effect.flip)
+      expect(error instanceof BackendError && error.reason).toBe(reason)
+      expect(ready.state === "ready" && ready.signal.aborted).toBe(true)
+      if (reason === "unavailable") {
+        yield* waitFor(supervisor.snapshot, "ready")
+        expect(discoveries).toBe(2)
+      } else {
+        expect(yield* waitFor(supervisor.snapshot, "stopped")).toEqual({ state: "stopped", reason })
+        yield* Effect.sleep(60)
+        expect(discoveries).toBe(1)
+      }
+    })))
+  } finally {
+    server.closeAllConnections()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
+
 test("supervisor heartbeats, invalidates outages, rediscovers process identity, and closes its scope", async () => {
   let processID: string = status.processID
   let available = true

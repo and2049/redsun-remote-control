@@ -27,6 +27,7 @@ export function attach(
       catch: (error) => error instanceof BackendError ? error : new BackendError("invalid-contract"),
     })
     let closed = false
+    let failure: BackendError | undefined
     const lifetime = new AbortController()
     const controllers = new Set<AbortController>()
 
@@ -36,6 +37,9 @@ export function attach(
       for (const controller of controllers) controller.abort()
       controllers.clear()
     })
+    const fail = (error: BackendError) => Effect.sync(() => {
+      failure ??= error
+    }).pipe(Effect.andThen(close))
 
     const check = (connected?: boolean) => Effect.scoped(Effect.gen(function* () {
       if (closed) return yield* Effect.fail(new BackendError("closed"))
@@ -63,7 +67,7 @@ export function attach(
       }
       if (closed) return yield* Effect.fail(new BackendError("closed"))
       return status
-    })).pipe(Effect.tapError(() => close))
+    })).pipe(Effect.tapError(fail))
 
     const status = yield* check()
     yield* Effect.addFinalizer(() => close)
@@ -71,19 +75,20 @@ export function attach(
       backendID: context.backendID,
       processID: context.registration.id,
       initialStatus: status,
+      failure: () => failure,
       status: () => check(),
       heartbeat: (connected: boolean) => check(connected),
       request: (input: unknown, signal: AbortSignal, responseLimit: number) => Effect.suspend(() => {
         if (closed) return Effect.fail(new BackendError("closed"))
         return remoteRequest(context.endpoint, context.authorization, input, AbortSignal.any([lifetime.signal, signal]), options.timeoutMs, responseLimit).pipe(
-          Effect.tapError((error) => error instanceof BackendError && !signal.aborted ? close : Effect.void),
+          Effect.tapError((error) => error instanceof BackendError && !signal.aborted ? fail(error) : Effect.void),
         )
       }),
       watch: (onSync: () => void) => watchEvents(context.endpoint, context.authorization, lifetime.signal, options.timeoutMs, (status) => {
         if (status && (status.backendID !== context.backendID || status.processID !== context.registration.id)) throw new BackendError("identity-mismatch")
         if (status && (!status.supported || !status.enabled || !status.enrolled || status.state === "disabled")) throw new BackendError("refused")
         onSync()
-      }).pipe(Effect.tapError(() => close)),
+      }).pipe(Effect.tapError(fail)),
       close,
     }
   })

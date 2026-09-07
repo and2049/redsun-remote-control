@@ -55,11 +55,11 @@ export function supervise(
         options.onSync?.()
         while (true) { yield* Effect.sleep(options.heartbeatMs); yield* heartbeat }
       })
-      if (!options.onSync) return yield* report
-      yield* Effect.all([report, connection.watch(() => {
+      const monitor = options.onSync ? Effect.all([report, connection.watch(() => {
         Effect.runSync(Deferred.succeed(subscribed, undefined))
         options.onSync?.()
-      })], { concurrency: "unbounded" })
+      })], { concurrency: "unbounded" }) : report
+      yield* monitor.pipe(Effect.mapError((error) => connection.failure() ?? error))
     }))
     const loop = Effect.gen(function* () {
       while (true) {
@@ -84,8 +84,9 @@ export function supervise(
       snapshot: (): BackendSnapshot => ({ ...snapshot }),
       request: (input: unknown, signal: AbortSignal, responseLimit: number) => Effect.suspend(() => {
         if (snapshot.state !== "ready" || !current || snapshot.signal.aborted) return Effect.fail(new BackendError("unavailable"))
+        const connection = current
         return current.request(input, AbortSignal.any([signal, snapshot.signal]), responseLimit).pipe(
-          Effect.tapError((error) => error instanceof BackendError && !signal.aborted ? Effect.gen(function* () {
+          Effect.tapError((error) => error instanceof BackendError && !signal.aborted && current === connection ? Effect.gen(function* () {
             snapshot = { state: "unavailable" }
             yield* invalidate
           }) : Effect.void),
