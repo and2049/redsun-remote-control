@@ -24,10 +24,14 @@ returns the app to the sign-in screen.
 ## Data flow
 
 The client subscribes to `/control/events` before loading state. Frames carry only a
-backend ID and a revision. A changed revision triggers a background refresh (session list,
-active map, and for the selected session its info, latest 200 messages, inbox, pending
-permissions and forms). Unchanged frames trigger a refresh only as a 30-second backstop.
-Refreshes are serialized; hints arriving mid-refresh mark it dirty and it runs again.
+backend ID and a revision. A changed revision requests a background refresh (session list,
+active map, and for the selected session its latest 200 messages, inbox, pending
+permissions and forms; session info comes from the list). Unchanged frames trigger a
+refresh only as a 30-second backstop. A scheduler (`src/refresh.ts`) serializes refreshes,
+coalesces hints that arrive while one runs, keeps background refreshes at least four
+seconds apart so a busy agent turn stays within the companion's shared rate budget
+(burst 60, two per second), and retries quietly after two seconds when a request is
+rate limited. User actions refresh immediately.
 Background refreshes carry `X-Redsun-Activity: background` so they do not extend session
 idle expiry; user actions refresh in the foreground. The stream reconnects with
 exponential backoff between two and thirty seconds. A backend ID change clears the
@@ -60,7 +64,9 @@ The header menu offers changing the host directory (a queued move that is confir
 the next snapshot, not by the 204), interrupting execution, opening the diagnostic page and
 signing out. The composer pills open model and agent pickers loaded from the scoped
 catalogs for the session location. Pending permissions and supported forms render above
-the composer one at a time.
+the composer one at a time. The new-session sheet queries catalogs only when the directory
+field is committed (blur), never per keystroke, because each location query makes the
+backend resolve that path and possibly load project plugins.
 
 ## Limits
 

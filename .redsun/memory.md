@@ -456,7 +456,18 @@ is sidebar plus chat. The browser client is plain async/await rather than Effect
 following the diagnostic precedent and keeping the bundle small. Refreshes are driven
 by the companion's revision frames with a 30-second backstop and run with the
 background activity header so they never extend idle expiry; user actions refresh in
-the foreground. Prompt IDs are retained in tab sessionStorage before sending; only 400
+the foreground. Live phone use on 2026-09-07 exposed two request-storm bugs: the
+new-session sheet queried catalogs per keystroke (each partial path is resolved by the
+backend and may load plugins; the resulting stall timed out the heartbeat and the
+supervisor's invalidate-before-retry policy signed the phone out), and each 250 ms
+revision frame during an agent turn triggered a seven-request refresh that exhausted
+the shared bucket, leaving the UI frozen on 429s. Fixed by committing the directory on
+blur only and by `apps/web/src/refresh.ts`: coalesced, serialized refreshes at most every
+four seconds in the background (six requests each), quiet retry two seconds after a 429,
+immediate foreground refreshes. The supervisor still revokes browser sessions on any
+transient attachment failure, including a single five-second heartbeat timeout; that
+policy is unchanged and worth revisiting if sign-outs recur. Prompt IDs are retained in
+tab sessionStorage before sending; only 400
 and 429 drop retention, any other failure marks the prompt unconfirmed with a Discard
 control, and each refresh reconciles against inbox and history. Prompts sent while the
 agent runs use the backend's default delivery (queued); steer is not exposed yet. The
@@ -637,7 +648,7 @@ and cancellation of stalled requests on scope release. Phone-test helper tests c
 origin/certificate/Serve-state parsing, pending approval lines and option parsing. The
 web app tests cover pure state/timeline/attachment helpers and static rendering of
 the timeline, approvals and markdown. The full suite now makes 872 assertions across
-27 files (260 tests) on Windows.
+28 files (266 tests) on Windows.
 Redsun verification run separately from its core directory:
 `bun run test ../server/test/remote-control.test.ts ../server/test/remote-admission.test.ts ../server/test/remote-projection.test.ts`
 passed 8 tests / 145 assertions. These use its isolated test harness, not the installed

@@ -91,6 +91,7 @@ export type NewSessionInput = { directory: string; title?: string; agent?: strin
 
 export function NewSession({ recent, onCreate, onClose }: { recent: string[]; onCreate: (input: NewSessionInput) => Promise<void>; onClose: () => void }) {
   const [directory, setDirectory] = useState(recent[0] ?? "")
+  const [committed, setCommitted] = useState(recent[0] ?? "")
   const [title, setTitle] = useState("")
   const [agent, setAgent] = useState("")
   const [model, setModel] = useState("")
@@ -101,7 +102,7 @@ export function NewSession({ recent, onCreate, onClose }: { recent: string[]; on
 
   useEffect(() => {
     let cancelled = false
-    const location = directory.trim() ? { directory: directory.trim() } : undefined
+    const location = committed.trim() ? { directory: committed.trim() } : undefined
     Promise.all([api.agents(location), api.models(location)])
       .then(([agentCatalog, modelCatalog]) => {
         if (cancelled) return
@@ -110,7 +111,7 @@ export function NewSession({ recent, onCreate, onClose }: { recent: string[]; on
       })
       .catch(() => { if (!cancelled) { setAgents([]); setModels([]) } })
     return () => { cancelled = true }
-  }, [directory])
+  }, [committed])
 
   async function submit() {
     setBusy(true)
@@ -132,7 +133,7 @@ export function NewSession({ recent, onCreate, onClose }: { recent: string[]; on
 
   return (
     <Sheet title="New session" onClose={onClose}>
-      <label className="field"><span>Host directory</span><input value={directory} onChange={(event) => setDirectory(event.target.value)} list="recent-directories" placeholder="C:\projects\app" autoFocus /></label>
+      <label className="field"><span>Host directory</span><input value={directory} onChange={(event) => setDirectory(event.target.value)} onBlur={() => setCommitted(directory)} list="recent-directories" placeholder="C:\projects\app" autoFocus /></label>
       <datalist id="recent-directories">{recent.map((path) => <option key={path} value={path} />)}</datalist>
       <label className="field"><span>Title (optional)</span><input value={title} onChange={(event) => setTitle(event.target.value)} /></label>
       <label className="field"><span>Agent</span>

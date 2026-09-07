@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { api, ApiError, auth, type RefreshFrame } from "./api"
 import { useConnection } from "./connection"
+import { makeScheduler, type RefreshResult, type Scheduler } from "./refresh"
 import { containsPrompt, creatingKey, newID, pendingPromptKey, readPending } from "./state"
 import type { ActiveSessions, AgentChoice, Attachment, FormValue, Location, ModelChoice, ModelRef, PromptBody, Session, SessionSnapshot } from "./types"
 import { Auth } from "./views/Auth"
@@ -13,10 +14,12 @@ type Sheet = { kind: "new" } | { kind: "menu" } | { kind: "move" } | { kind: "mo
 type CatalogState = { agents: AgentChoice[]; models: ModelChoice[]; loading: boolean; error?: string }
 
 const backstopMs = 30_000
+const refreshIntervalMs = 4000
+const throttleRetryMs = 2000
 
-async function loadSnapshot(id: string, running: boolean, background: boolean): Promise<SessionSnapshot> {
+async function loadSnapshot(id: string, listed: Session | undefined, running: boolean, background: boolean): Promise<SessionSnapshot> {
   const [session, messages, inbox, permissions, forms] = await Promise.all([
-    api.session(id, background),
+    listed ? Promise.resolve({ data: listed }) : api.session(id, background),
     api.messages(id, { limit: "200", order: "desc" }, background),
     api.inbox(id, background),
     api.permissions(id, background),
@@ -44,8 +47,7 @@ export function App() {
   const backendRef = useRef("")
   const revisionRef = useRef(-1)
   const lastRefreshRef = useRef(0)
-  const refreshingRef = useRef(false)
-  const dirtyRef = useRef(false)
+  const schedulerRef = useRef<Scheduler | undefined>(undefined)
 
   const report = useCallback((failure: unknown) => {
     if (failure instanceof ApiError && failure.status === 401) {
@@ -89,32 +91,35 @@ export function App() {
     setPending((previous) => ({ body: retained, unconfirmed: previous?.body.id === retained.id ? previous.unconfirmed : true }))
   }, [])
 
-  const refresh = useCallback(async (background: boolean) => {
-    if (refreshingRef.current) {
-      dirtyRef.current = true
-      return
-    }
-    refreshingRef.current = true
+  const load = useCallback(async (background: boolean): Promise<RefreshResult> => {
     lastRefreshRef.current = Date.now()
     try {
-      do {
-        dirtyRef.current = false
-        const [list, running] = await Promise.all([api.sessions({ parentID: "null", limit: "100" }, background), api.active(background)])
-        setSessions(list.data)
-        setActive(running.data)
-        const id = selectedRef.current
-        if (!id) continue
-        const loaded = await loadSnapshot(id, id in running.data, background)
-        if (selectedRef.current !== id) continue
-        setSnapshot(loaded)
-        reconcile(id, loaded)
-      } while (dirtyRef.current)
+      const [list, running] = await Promise.all([api.sessions({ parentID: "null", limit: "100" }, background), api.active(background)])
+      setSessions(list.data)
+      setActive(running.data)
+      const id = selectedRef.current
+      if (!id) return "ok"
+      const loaded = await loadSnapshot(id, list.data.find((session) => session.id === id), id in running.data, background)
+      if (selectedRef.current !== id) return "ok"
+      setSnapshot(loaded)
+      reconcile(id, loaded)
+      return "ok"
     } catch (failure) {
+      if (failure instanceof ApiError && failure.status === 429) return "throttled"
       report(failure)
-    } finally {
-      refreshingRef.current = false
+      return "ok"
     }
   }, [reconcile, report])
+
+  const loadRef = useRef(load)
+  loadRef.current = load
+
+  const refresh = useCallback(async (background: boolean) => {
+    schedulerRef.current ??= makeScheduler((mode) => loadRef.current(mode), { intervalMs: refreshIntervalMs, retryMs: throttleRetryMs })
+    schedulerRef.current.request(background)
+  }, [])
+
+  useEffect(() => () => schedulerRef.current?.dispose(), [])
 
   const select = useCallback((id: string | undefined) => {
     selectedRef.current = id
