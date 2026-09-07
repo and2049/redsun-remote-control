@@ -15,6 +15,7 @@ export type SupervisorOptions = {
   readonly connected: () => boolean
   readonly invalidate: Effect.Effect<void>
   readonly onSync?: () => void
+  readonly onStop?: (reason: BackendError["reason"]) => void
 }
 
 export function supervise(
@@ -67,7 +68,7 @@ export function supervise(
         const error = result._tag === "Failure" ? result.failure : new BackendError("closed")
         snapshot = error.reason === "unavailable" ? { state: "unavailable" } : { state: "stopped", reason: error.reason }
         yield* invalidate
-        if (error.reason !== "unavailable") return
+        if (error.reason !== "unavailable") { options.onStop?.(error.reason); return }
         yield* Effect.sleep(options.retryMs)
         snapshot = { state: "connecting" }
       }

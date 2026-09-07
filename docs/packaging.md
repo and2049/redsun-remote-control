@@ -50,6 +50,16 @@ environment variable instead of a script parameter.
 - `importHandoff(handoff, directory?)`: in-process enrollment. Validates the v1
   handoff object and creates `backend.json` with the private-file rules. It never
   overwrites an existing handoff; the caller must revoke or remove it first.
+- `serveCompanion` also yields `local`, the structured approval API (`open`, `pending`,
+  `approve(requestID, fingerprint)`, `cancel`, `recover`) so a host can drive phone
+  registration from its own UI instead of the stdin commands.
+- `inspectTailscale(port)`: runs `tailscale status --json` and `tailscale serve status
+  --json` and reports the MagicDNS host, the HTTPS origin, whether certificates are
+  enabled and whether the Serve mapping for the port is `missing`, `ready` or
+  `conflict`. `applyServe(port)` applies `tailscale serve --bg --https=443
+  http://127.0.0.1:<port>` only when the mapping is missing and certificates exist;
+  it refuses conflicts. `serveCommand(port)` is the display string. Both accept an
+  injectable runner for tests and never reset existing Serve configuration.
 - `importHandoffFile(path, directory?)`, `checkBackend(directory?)`,
   `recoverBrowser(directory?)`, `dataDirectory()`, `parseCommand`, `validateServe`,
   `StorageError`, and the `Health` type.

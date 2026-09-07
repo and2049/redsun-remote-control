@@ -17,6 +17,7 @@ export function operational(directory: string, origin: string, auth: Authenticat
       connected: () => control?.connected() ?? false,
       invalidate: auth.revoke.pipe(Effect.ignore),
       onSync: () => control?.refresh(),
+      onStop: (reason) => console.error(`Backend supervision stopped: ${reason}. Correct the problem locally and restart the companion.`),
     })
     control = makeControl(auth, backend, origin)
     const handler = control

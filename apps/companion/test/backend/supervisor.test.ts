@@ -115,13 +115,15 @@ test("supervisor heartbeats, invalidates outages, rediscovers process identity, 
 test.each(["refused", "identity-mismatch", "invalid-contract", "invalid-endpoint"] as const)(
   "supervisor stops without retries on %s", async (reason) => {
     let discoveries = 0
+    const stops: string[] = []
     await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
       const supervisor = yield* supervise(decodeHandoff(handoff), {
-        timeoutMs: 100, heartbeatMs: 10, retryMs: 10, connected: () => false, invalidate: Effect.void,
+        timeoutMs: 100, heartbeatMs: 10, retryMs: 10, connected: () => false, invalidate: Effect.void, onStop: (why) => stops.push(why),
       }, Effect.suspend(() => { discoveries += 1; return Effect.fail(new BackendError(reason)) }))
       expect(yield* waitFor(supervisor.snapshot, "stopped")).toEqual({ state: "stopped", reason })
       yield* Effect.sleep(30)
       expect(discoveries).toBe(1)
+      expect(stops).toEqual([reason])
     })))
   },
 )

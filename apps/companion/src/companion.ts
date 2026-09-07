@@ -1,4 +1,5 @@
 import { Effect } from "effect"
+import type { Authentication } from "./auth/service"
 import { serve } from "./server"
 import { validateServe } from "./command"
 import { dataDirectory, importBackend, storeHandoff } from "./storage/backend"
@@ -9,6 +10,8 @@ import { handleRequest } from "./http"
 import { localCommand } from "./local"
 import { probeBackend } from "./backend/probe"
 import { operational } from "./operational"
+
+export type Local = Authentication["local"]
 
 export type ServeOptions = {
   readonly origin: string
@@ -45,6 +48,6 @@ export function serveCompanion(options: ServeOptions) {
       if (pathname.startsWith("/auth/") || !remote) return http.handle(request)
       return remote(request)
     }, options.backend ? 6 * 1024 * 1024 : 65536)
-    return { command: (line: string) => localCommand(auth, line) }
+    return { command: (line: string) => localCommand(auth, line), local: auth.local }
   })
 }

@@ -551,6 +551,15 @@ not an app defect (programmatic clicks behaved).
   `dataDirectory`, `parseCommand`, `validateServe`, `StorageError`, `Health`.
   Programmatic errors surface their own messages rather than Effect's generic
   `Effect.try` wrapper.
+- 0.2.0 (2026-09-07): `serveCompanion` exposes `local` (structured approval API) and
+  `src/tailscale.ts` provides `inspectTailscale`/`applyServe`/`serveCommand` (moved
+  from the phone-test script) so redsun can host the companion in-process: the user
+  chose that enabling remote control in redsun starts the companion inside the
+  managed service, disabling stops it, passkey approval moves into the `/remote`
+  dialog, and the Tailscale Serve mapping is a one-key dialog action with
+  confirmation (never automatic). The supervisor still stops permanently on policy
+  refusal (401/403); redsun restarts a fresh companion on enable, and the stop reason
+  is now logged to stderr via `onStop`.
 - redsun side (feature branch `feat/remote-control-integration`): the TUI `/remote`
   dialog was redesigned per `.redsun/plans/remote-control-host-ux.md` (dynamic
   options, coloured state, per-state guidance, in-dialog enrollment). The follow-up
