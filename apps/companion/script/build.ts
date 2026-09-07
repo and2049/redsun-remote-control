@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, rm, writeFile } from "node:fs/promises"
 import { fileURLToPath } from "node:url"
 import { buildAssets } from "../src/assets-source"
 
@@ -8,6 +8,7 @@ const assets = await buildAssets()
 await mkdir(at("../src/generated"), { recursive: true })
 await writeFile(at("../src/generated/assets.ts"), `import type { Built } from "../assets-source"\n\nexport const assets: Built = ${JSON.stringify(assets)}\n`)
 await rm(at("../dist"), { recursive: true, force: true })
+await copyFile(at("../../../LICENSE"), at("../LICENSE"))
 const bundle = await Bun.build({
   entrypoints: [at("../src/index.ts"), at("../src/cli.ts")],
   outdir: at("../dist"), target: "bun", format: "esm", splitting: true, packages: "external",

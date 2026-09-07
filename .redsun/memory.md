@@ -526,8 +526,8 @@ not an app defect (programmatic clicks behaved).
 
 ### npm packaging and redsun integration
 
-- `apps/companion` is published as `redsun-remote-control` (version 0.1.0, license
-  field MIT pending the user's confirmation; no LICENSE file exists yet). The root
+- `apps/companion` is published as `redsun-remote-control` (version 0.1.0, MIT licensed;
+  the root LICENSE is copied into the tarball by the build). The root
   workspace package is `@redsun-remote/workspace`; `packages/protocol` was folded into
   `src/http.ts`. Publishing is user-run: push a `v<version>` tag and the `Publish`
   workflow builds, tests and runs `npm publish --provenance` via npm trusted

@@ -8,7 +8,7 @@
   "engines": { "bun": ">=1.3.0" },
   "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
   "bin": { "redsun-remote-control": "./dist/cli.js" },
-  "files": ["dist"],
+  "files": ["dist", "LICENSE"],
   "scripts": {
     "build": "bun run script/build.ts && tsc -p tsconfig.build.json",
     "prepack": "bun run build"

@@ -7,3 +7,4 @@ coverage/
 *.tsbuildinfo
 
 apps/companion/src/generated/assets.ts
+apps/companion/LICENSE
