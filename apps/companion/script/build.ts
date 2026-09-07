@@ -1,4 +1,4 @@
-import { copyFile, mkdir, rm, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { fileURLToPath } from "node:url"
 import { buildAssets } from "../src/assets-source"
 
@@ -10,11 +10,12 @@ await writeFile(at("../src/generated/assets.ts"), `import type { Built } from ".
 await rm(at("../dist"), { recursive: true, force: true })
 await copyFile(at("../../../LICENSE"), at("../LICENSE"))
 const bundle = await Bun.build({
-  entrypoints: [at("../src/index.ts"), at("../src/cli.ts")],
-  outdir: at("../dist"), target: "bun", format: "esm", splitting: true, packages: "external",
+  entrypoints: [at("../src/index.ts")],
+  outdir: at("../dist"), target: "bun", format: "esm", packages: "external",
 })
 if (!bundle.success) {
   for (const log of bundle.logs) console.error(String(log))
   process.exit(1)
 }
+await writeFile(at("../dist/cli.js"), (await readFile(at("../src/cli.ts"), "utf8")).replace('"./index"', '"./index.js"'))
 console.log(bundle.outputs.map((output) => `${output.path} ${output.size}`).join("\n"))

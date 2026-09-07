@@ -11,8 +11,10 @@ is build input only.
 
 1. `script/build.ts` bundles the web app (`apps/web/src/main.tsx`) and the diagnostic
    page script with `Bun.build` and writes them as string constants to
-   `src/generated/assets.ts` (gitignored). It then bundles `src/index.ts` and
-   `src/cli.ts` for the Bun target with all node_modules packages external.
+   `src/generated/assets.ts` (gitignored). It then bundles `src/index.ts` into a
+   single `dist/index.js` for the Bun target with all node_modules packages external
+   and copies `src/cli.ts` as the `dist/cli.js` shim. Code splitting stays off:
+   redsun's compiled-binary build rejects prebuilt chunks with duplicate output paths.
 2. `tsc -p tsconfig.build.json` emits declarations next to the bundle.
 
 `files` restricts the tarball to `dist`. `prepack` runs the build, so `npm pack` and

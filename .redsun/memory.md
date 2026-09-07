@@ -533,8 +533,10 @@ not an app defect (programmatic clicks behaved).
   workflow builds, tests and runs `npm publish --provenance` via npm trusted
   publishing, or run `npm publish` from `apps/companion` for the first release.
 - `bun run build` in `apps/companion` writes the web app and diagnostic bundles to the
-  gitignored `src/generated/assets.ts`, bundles `src/index.ts` and `src/cli.ts` for
-  Bun with node_modules external, and emits declarations. `src/embedded.ts` imports the
+  gitignored `src/generated/assets.ts`, bundles `src/index.ts` into a single
+  `dist/index.js` (no code splitting: redsun's compiled build rejects prebuilt chunks
+  with duplicate output paths), copies `src/cli.ts` as the `dist/cli.js` shim, and
+  emits declarations. `src/embedded.ts` imports the
   generated module and falls back to building from source when it is absent, so tests
   and `bun run dev` need no build step; the committed `src/generated/assets.d.ts`
   keeps the import typechecking. Runtime `Bun.build` at startup is gone because

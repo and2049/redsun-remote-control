@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { main } from "./main"
+import { main } from "./index"
 
 const controller = new AbortController()
 const stop = () => controller.abort()
