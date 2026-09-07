@@ -2,11 +2,40 @@ import { modelLabel } from "./state"
 import type { AssistantPart, Message } from "./types"
 
 export type ToolPart = Extract<AssistantPart, { type: "tool" }>
+export type TodoItem = { content: string; status: string; children: TodoItem[] }
 export type Entry = { key: string } & (
   | { kind: "user" | "assistant-text" | "reasoning" | "switch" | "note" | "error"; text: string }
   | { kind: "work"; tools: ToolPart[] }
+  | { kind: "tasks"; todos: TodoItem[]; running: boolean }
   | { kind: "shell"; command: string; output: string }
 )
+
+export function isTaskTool(name: string): boolean {
+  return name === "todowrite" || name === "TodoWrite"
+}
+
+export function todoItems(value: unknown): TodoItem[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item): TodoItem[] => {
+    if (typeof item !== "object" || item === null) return []
+    const { content, status, children } = item as Record<string, unknown>
+    if (typeof content !== "string" || typeof status !== "string") return []
+    return [{ content, status, children: todoItems(children) }]
+  })
+}
+
+export function flattenTodos(todos: readonly TodoItem[]): TodoItem[] {
+  return todos.flatMap((todo) => [todo, ...flattenTodos(todo.children)])
+}
+
+export function openTodos(todos: readonly TodoItem[]): number {
+  return flattenTodos(todos).filter((todo) => todo.status !== "completed" && todo.status !== "cancelled").length
+}
+
+function taskEntry(key: string, tool: ToolPart): Entry {
+  const input = tool.state.status === "streaming" ? undefined : tool.state.input
+  return { key, kind: "tasks", todos: todoItems(input?.todos), running: tool.state.status === "streaming" || tool.state.status === "running" }
+}
 
 const actions: Record<string, readonly [string, string, string]> = {
   write: ["created", "a file", "files"],
@@ -57,7 +86,8 @@ export function timelineEntries(messages: Message[]): Entry[] {
       message.content.forEach((part, index) => {
         const key = `${message.id}:${index}`
         const previous = entries[entries.length - 1]
-        if (part.type === "tool") {
+        if (part.type === "tool" && isTaskTool(part.name)) entries.push(taskEntry(key, part))
+        else if (part.type === "tool") {
           if (previous?.kind === "work") entries[entries.length - 1] = { ...previous, tools: [...previous.tools, part] }
           else entries.push({ key, kind: "work", tools: [part] })
         } else entries.push({ key, kind: part.type === "text" ? "assistant-text" : "reasoning", text: part.text })

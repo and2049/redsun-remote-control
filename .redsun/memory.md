@@ -487,9 +487,16 @@ the last theme in localStorage, and the app refetches it on connect and every 60
 Derived tokens use `color-mix`. The host currently has no theme configured, so it reports
 `dusk` (dark, yellow primary). Live phone verification of the theme is the user's next step.
 
+Task lists (2026-09-07, user request): `todowrite`/`TodoWrite` calls render as a
+dedicated expanded task block mirroring the TUI's checklist (glyphs, one level of
+children, accent for in-progress, subdued/struck for done/cancelled) instead of joining a
+work group; data is read from the tool input because projections drop metadata. Other
+tools keep the generic rendering by design.
+
 Restart procedure while the user works remotely: after companion changes, stop the running
 `serve --backend` process tree and start it detached (PowerShell `Start-Process`, hidden,
-logs in `%TEMP%edsun-companion.log`) with the same origin/port the phone-test run used;
+logs in `%TEMP%
+edsun-companion.log`) with the same origin/port the phone-test run used;
 after redsun backend changes, `bun src/index.ts service restart` from `packages/cli`, which
 signs the phone out once through supervisor invalidation. Never commit the private origin.
 
@@ -667,7 +674,7 @@ and cancellation of stalled requests on scope release. Phone-test helper tests c
 origin/certificate/Serve-state parsing, pending approval lines and option parsing. The
 web app tests cover pure state/timeline/attachment helpers and static rendering of
 the timeline, approvals and markdown. The full suite now makes 872 assertions across
-29 files (270 tests) on Windows.
+29 files (272 tests) on Windows.
 Redsun verification run separately from its core directory:
 `bun run test ../server/test/remote-control.test.ts ../server/test/remote-admission.test.ts ../server/test/remote-projection.test.ts`
 passed 8 tests / 145 assertions. These use its isolated test harness, not the installed

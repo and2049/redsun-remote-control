@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { timelineEntries, toolOutput, toolSubject, workGroupLabel, type ToolPart } from "../src/timeline"
+import { flattenTodos, openTodos, timelineEntries, todoItems, toolOutput, toolSubject, workGroupLabel, type ToolPart } from "../src/timeline"
 
 function tool(name: string, state: ToolPart["state"] = { status: "running", input: {} }): ToolPart {
   return { type: "tool", id: name, name, state, time: { created: 0 } }
@@ -14,6 +14,26 @@ describe("timeline", () => {
     expect(entries.map((entry) => entry.kind)).toEqual(["work", "assistant-text", "work", "work"])
     expect(entries.map((entry) => entry.key)).toEqual(["a:0", "a:2", "a:3", "b:0"])
     expect(entries[0]).toMatchObject({ tools: [tool("write"), tool("bash")] })
+  })
+  test("task list tools become their own entries with parsed children", () => {
+    const todos = [
+      { content: "Parent", status: "in_progress", priority: "high", children: [{ content: "Child", status: "completed", priority: "low" }, { bad: true }] },
+      { content: "Later", status: "pending", priority: "low" },
+      "junk",
+    ]
+    const entries = timelineEntries([
+      { id: "a", type: "assistant", time: { created: 0 }, content: [tool("read"), tool("todowrite", { status: "completed", input: { todos }, content: [{ type: "text", text: "3 todos" }] }), tool("bash"), tool("TodoWrite", { status: "streaming", input: "{" })] },
+    ])
+    expect(entries.map((entry) => entry.kind)).toEqual(["work", "tasks", "work", "tasks"])
+    expect(entries[1]).toMatchObject({ running: false, todos: [
+      { content: "Parent", status: "in_progress", children: [{ content: "Child", status: "completed", children: [] }] },
+      { content: "Later", status: "pending", children: [] },
+    ] })
+    expect(entries[3]).toMatchObject({ running: true, todos: [] })
+    const parsed = todoItems(todos)
+    expect(flattenTodos(parsed).map((todo) => todo.content)).toEqual(["Parent", "Child", "Later"])
+    expect(openTodos(parsed)).toBe(2)
+    expect(todoItems(undefined)).toEqual([])
   })
   test("summarizes aliases and plural counts in encounter order", () => {
     expect(workGroupLabel([tool("write"), tool("bash")])).toBe("Created a file, ran a command")

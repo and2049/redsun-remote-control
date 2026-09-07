@@ -33,6 +33,16 @@
 .tool-output { margin-top: 0.5rem; min-width: 0; }
 .tool-output pre { background: var(--code-bg); padding: 0.75rem; border-radius: var(--radius); max-height: 20rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .tool-output button { color: var(--accent); padding: 0.35rem 0; }
+.tasks { min-width: 0; font-size: 0.875rem; color: var(--ink-secondary); }
+.tasks > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 0.5rem; }
+.tasks > summary::-webkit-details-marker { display: none; }
+.tasks-count { color: var(--ink-tertiary); }
+.todo-list { list-style: none; margin: 0.5rem 0 0; padding: 0 0 0 0.9rem; border-left: 1px solid var(--border); display: grid; gap: 0.25rem; }
+.todo-line { display: flex; gap: 0.5rem; align-items: baseline; color: var(--ink); overflow-wrap: anywhere; }
+.todo-line.in_progress { color: var(--accent); }
+.todo-line.completed, .todo-line.cancelled { color: var(--ink-tertiary); }
+.todo-line.cancelled > span:last-child { text-decoration: line-through; }
+.todo-glyph { flex-shrink: 0; font-family: var(--font-mono); }
 .shell-entry { min-width: 0; overflow-wrap: anywhere; }
 .shell-entry > code { white-space: pre-wrap; }
 .switch-entry { text-align: center; color: var(--ink-tertiary); font-size: 0.75rem; }

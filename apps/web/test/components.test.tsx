@@ -23,6 +23,18 @@ test("timeline renders user, work, inbox, pending and running states", () => {
   expect(html).not.toContain("x".repeat(2001))
 })
 
+test("task lists render status glyphs, nesting and counts", () => {
+  const html = renderToStaticMarkup(<Timeline messages={[
+    { id: "a", type: "assistant", time: { created: 0 }, content: [
+      { type: "tool", id: "t", name: "todowrite", state: { status: "completed", input: { todos: [
+        { content: "Parent", status: "in_progress", children: [{ content: "Child", status: "completed" }, { content: "Dropped", status: "cancelled" }] },
+      ] }, content: [{ type: "text", text: "3 todos (1 open)" }] }, time: { created: 0 } },
+    ] },
+  ]} inbox={[]} running={false} />)
+  for (const text of ["3 tasks", "(1 open)", 'class="todo-line in_progress"', 'class="todo-line completed"', 'class="todo-line cancelled"', "Parent", "Child", "Dropped", "padding-left:1.25rem"]) expect(html).toContain(text)
+  expect(html).not.toContain("Created a file")
+})
+
 test("permissions render first action, resources and approval choices", () => {
   const html = renderToStaticMarkup(<Approvals permissions={[{ id: "p", sessionID: "s", action: "Write file", resources: ["src/main.ts"], message: "Needs access" }]} forms={[{ id: "f", sessionID: "s", title: "Hidden form", fields: [] }]} onPermission={reply} onForm={reply} onCancelForm={reply} />)
   for (const text of ["Write file", "<code>src/main.ts</code>", "Needs access", "Approve once", "Always allow", "Reject", "1 of 2"]) expect(html).toContain(text)

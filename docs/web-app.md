@@ -71,7 +71,12 @@ The header menu offers changing the host directory (a queued move that is confir
 the next snapshot, not by the 204), interrupting execution, opening the diagnostic page and
 signing out. The composer pills open model and agent pickers loaded from the scoped
 catalogs for the session location. Pending permissions and supported forms render above
-the composer one at a time. The new-session sheet queries catalogs only when the directory
+the composer one at a time. The task-list tool (`todowrite`, and Claude Code's
+`TodoWrite`) is rendered specially, like the TUI: an expanded "Tasks" block with a task
+count, one line per item with a status glyph, children indented one level, in-progress
+items in the accent color and completed or cancelled items subdued. Every other tool
+stays in the collapsed work groups. The list comes from the tool call input, since the
+remote projection drops tool metadata. The new-session sheet queries catalogs only when the directory
 field is committed (blur), never per keystroke, because each location query makes the
 backend resolve that path and possibly load project plugins.
 

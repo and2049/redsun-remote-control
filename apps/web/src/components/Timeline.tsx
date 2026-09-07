@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { timelineEntries, toolOutput, toolSubject, workGroupLabel, type Entry, type ToolPart } from "../timeline"
+import { flattenTodos, openTodos, timelineEntries, toolOutput, toolSubject, workGroupLabel, type Entry, type TodoItem, type ToolPart } from "../timeline"
 import type { InboxItem, Message, PromptBody } from "../types"
 import { Markdown } from "./Markdown"
 
@@ -20,6 +20,27 @@ function Tool({ tool }: { tool: ToolPart }) {
   </div><Output text={toolOutput(tool)} /></div>
 }
 
+const todoGlyphs: Record<string, string> = { pending: "\u25FB", in_progress: "\u25D0", completed: "\u25FC", cancelled: "\u2717" }
+
+function TodoLine({ todo, depth }: { todo: TodoItem; depth: number }) {
+  return <>
+    <li className={`todo-line ${todo.status}`} style={{ paddingLeft: `${depth * 1.25}rem` }}>
+      <span className="todo-glyph" aria-hidden="true">{todoGlyphs[todo.status] ?? todoGlyphs.pending}</span>
+      <span>{todo.content}</span>
+    </li>
+    {todo.children.map((child, index) => <TodoLine key={`${depth}:${index}:${child.content}`} todo={child} depth={depth + 1} />)}
+  </>
+}
+
+function Tasks({ todos, running }: { todos: TodoItem[]; running: boolean }) {
+  const total = flattenTodos(todos).length
+  const open = openTodos(todos)
+  return <details className="tasks" open>
+    <summary>{running && <span className="pulse-dot" role="status" aria-label="Updating tasks" />}Tasks<span className="tasks-count">{total} task{total === 1 ? "" : "s"} ({open} open)</span></summary>
+    {todos.length > 0 && <ul className="todo-list">{todos.map((todo, index) => <TodoLine key={`${index}:${todo.content}`} todo={todo} depth={0} />)}</ul>}
+  </details>
+}
+
 function Bubble({ text, caption }: { text: string; caption?: string }) {
   return <div className="user-entry"><div className="user-bubble">{text}</div>{caption && <small className="bubble-caption">{caption}</small>}</div>
 }
@@ -32,6 +53,7 @@ function RenderEntry({ entry }: { entry: Entry }) {
     case "work": return <details className="work-group"><summary>{workGroupLabel(entry.tools)}</summary>
       {entry.tools.map((tool, index) => <Tool key={`${entry.key}:${index}:${tool.id}`} tool={tool} />)}
     </details>
+    case "tasks": return <Tasks todos={entry.todos} running={entry.running} />
     case "shell": return <div className="shell-entry"><code>{entry.command}</code><Output text={entry.output} /></div>
     case "switch": return <div className="switch-entry"><span>{entry.text}</span></div>
     case "note": return <div className="timeline-note" title={entry.text}>{entry.text}</div>
