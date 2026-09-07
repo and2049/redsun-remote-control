@@ -560,6 +560,19 @@ not an app defect (programmatic clicks behaved).
   confirmation (never automatic). The supervisor still stops permanently on policy
   refusal (401/403); redsun restarts a fresh companion on enable, and the stop reason
   is now logged to stderr via `onStop`.
+- In-process hosting verified live on 2026-09-07: redsun commit `0e1b993cc7` adds
+  `origin`/`port` to the host-local `remote_control` settings, starts the companion inside
+  the managed service when enabled, enrolled and configured (stops on disable/revoke,
+  restarts after enrollment or origin change), exposes local-only routes
+  (`/api/remote/companion` GET/PUT, `/registration` POST/DELETE, `/approval` POST,
+  `/api/remote/tailscale` GET/POST) that stay off the scoped allowlist, and the `/remote`
+  dialog prompts for the origin on first enable, registers/approves phones by fingerprint
+  and maps Tailscale Serve only after confirmation. The standalone companion process on the
+  test host was retired; the service now serves the phone on port 43123, so restarting the
+  local redsun service also restarts the companion (phone signs in again). Web UI changes
+  reach the phone only through a rebuilt package installed into redsun (tarball or
+  published version) plus a service restart; `redsun remote companion serve` on another
+  port remains available for quick standalone checks.
 - redsun side (feature branch `feat/remote-control-integration`): the TUI `/remote`
   dialog was redesigned per `.redsun/plans/remote-control-host-ux.md` (dynamic
   options, coloured state, per-state guidance, in-dialog enrollment). The follow-up
