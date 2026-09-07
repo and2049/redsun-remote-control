@@ -11,7 +11,7 @@ import { Sessions } from "./views/Sessions"
 import { DirectoryPrompt, Menu, NewSession, Picker, type NewSessionInput } from "./views/Sheets"
 
 type Phase = "checking" | "signed-out" | "signed-in"
-type Sheet = { kind: "new" } | { kind: "menu" } | { kind: "move" } | { kind: "model" } | { kind: "agent" }
+type Sheet = { kind: "new" } | { kind: "list" } | { kind: "menu" } | { kind: "move" } | { kind: "model" } | { kind: "agent" }
 type CatalogState = { agents: AgentChoice[]; models: ModelChoice[]; loading: boolean; error?: string }
 
 const backstopMs = 30_000
@@ -234,7 +234,7 @@ export function App() {
 
   return (
     <div className={`shell ${showingChat ? "showing-chat" : "showing-list"}`}>
-      <Sessions sessions={sessions} active={active} selected={selected} connection={connection} onSelect={select} onNew={() => setSheet({ kind: "new" })} />
+      <Sessions sessions={sessions} active={active} selected={selected} connection={connection} onSelect={select} onNew={() => setSheet({ kind: "new" })} onMenu={() => setSheet({ kind: "list" })} />
       <main className="main">
         {snapshot ? (
           <Chat
@@ -259,6 +259,16 @@ export function App() {
         )}
       </main>
       {sheet?.kind === "new" && <NewSession recent={recent} onCreate={create} onClose={() => setSheet(undefined)} />}
+      {sheet?.kind === "list" && (
+        <Menu
+          title={connection.message ?? connection.state}
+          onClose={() => setSheet(undefined)}
+          items={[
+            { label: "Diagnostic page", description: "Raw operations and reconciliation", action: () => window.location.assign("/diagnostic") },
+            { label: "Sign out", danger: true, action: () => void auth.logout().finally(() => setPhase("signed-out")) },
+          ]}
+        />
+      )}
       {sheet?.kind === "menu" && current && (
         <Menu
           title="Session"

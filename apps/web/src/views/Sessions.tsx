@@ -1,5 +1,6 @@
-import { PlusIcon } from "../icons"
-import { bucketSessions, directoryName, relativeTime, sessionTitle } from "../state"
+import { useState } from "react"
+import { MenuIcon, PlusIcon, SearchIcon } from "../icons"
+import { directoryName, relativeTime, sessionTitle } from "../state"
 import type { ActiveSessions, Session } from "../types"
 
 export type Connection = { state: "connecting" | "connected" | "disconnected"; message?: string }
@@ -11,33 +12,48 @@ type Props = {
   connection: Connection
   onSelect: (id: string) => void
   onNew: () => void
+  onMenu: () => void
 }
 
-export function Sessions({ sessions, active, selected, connection, onSelect, onNew }: Props) {
+export function matchesSearch(session: Session, query: string): boolean {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return true
+  return `${sessionTitle(session)} ${session.location.directory} ${session.agent ?? ""}`.toLowerCase().includes(needle)
+}
+
+export function sessionMeta(session: Session, now = Date.now()): string {
+  const parts = [relativeTime(session.time.updated, now), directoryName(session.location.directory), session.agent]
+  return parts.filter((part) => part).join(" · ")
+}
+
+export function Sessions({ sessions, active, selected, connection, onSelect, onNew, onMenu }: Props) {
+  const [query, setQuery] = useState<string>()
+  const visible = sessions.filter((session) => matchesSearch(session, query ?? ""))
   return (
     <aside className="sidebar">
-      <div className="sidebar-header">
+      <header className="list-header">
+        <button className="icon-button" aria-label="Menu" onClick={onMenu}>
+          <MenuIcon />
+          <span className={`badge ${connection.state}`} aria-label={connection.message ?? connection.state} />
+        </button>
         <h1>Redsun</h1>
-        <button className="icon-button" aria-label="New session" onClick={onNew}><PlusIcon /></button>
-      </div>
+        <button className={`icon-button${query === undefined ? "" : " active"}`} aria-label="Search sessions" onClick={() => setQuery(query === undefined ? "" : undefined)}><SearchIcon /></button>
+      </header>
+      {query !== undefined && <input className="search" type="search" placeholder="Search sessions" value={query} onChange={(event) => setQuery(event.target.value)} autoFocus />}
       <div className="session-list">
-        {sessions.length === 0 && <p className="notice" style={{ padding: "0.5rem 0.75rem" }}>No sessions yet.</p>}
-        {bucketSessions(sessions).map((bucket) => (
-          <div key={bucket.label}>
-            <div className="session-group">{bucket.label}</div>
-            {bucket.sessions.map((session) => (
-              <button key={session.id} className={`session-row${session.id === selected ? " selected" : ""}`} onClick={() => onSelect(session.id)}>
-                <span className="title">{session.id in active && <span className="running" />}{sessionTitle(session)}</span>
-                <span className="time">{relativeTime(session.time.updated)}</span>
-                <span className="meta">{directoryName(session.location.directory)}{session.agent ? ` · ${session.agent}` : ""}</span>
-              </button>
-            ))}
-          </div>
+        <div className="section-label">Sessions</div>
+        {visible.length === 0 && <p className="notice">{sessions.length === 0 ? "No sessions yet." : "No matching sessions."}</p>}
+        {visible.map((session) => (
+          <button key={session.id} className={`session-row${session.id === selected ? " selected" : ""}`} onClick={() => onSelect(session.id)}>
+            <span className={`dot${session.id in active ? " running" : ""}`} aria-label={session.id in active ? "Running" : undefined} />
+            <span className="row-text">
+              <span className="title">{sessionTitle(session)}</span>
+              <span className="meta">{sessionMeta(session)}</span>
+            </span>
+          </button>
         ))}
       </div>
-      <div className="sidebar-footer">
-        <span><span className={`status-dot ${connection.state === "connected" ? "connected" : connection.state === "disconnected" ? "error" : ""}`} />{connection.message ?? connection.state}</span>
-      </div>
+      <button className="fab" onClick={onNew}><PlusIcon /> New session</button>
     </aside>
   )
 }

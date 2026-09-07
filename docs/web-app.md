@@ -44,8 +44,13 @@ idle expiry; user actions refresh in the foreground. The stream reconnects with
 exponential backoff between two and thirty seconds. A backend ID change clears the
 selection and retained state.
 
-Sessions are listed newest first, top-level only (`parentID=null`), grouped by recency.
-Directories from listed sessions feed the recent-directory suggestions.
+Sessions are listed newest first, top-level only (`parentID=null`), in one "Sessions"
+section styled after the Claude Code app list: a status dot (running or idle), the title,
+and a subline of relative time, directory name and agent. The header has a round menu
+button whose badge shows connection state (menu: diagnostic page, sign out) and a search
+toggle that filters the loaded list client-side by title, directory and agent. A floating
+"New session" pill opens the creation sheet. Directories from listed sessions feed the
+recent-directory suggestions.
 
 ## Prompts and uncertainty
 

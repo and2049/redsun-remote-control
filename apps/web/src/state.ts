@@ -58,17 +58,3 @@ export function modelLabel(model: ModelRef | undefined): string {
   if (!model) return "Default model"
   return model.variant ? `${model.id} ${model.variant}` : model.id
 }
-
-export type Bucket = { label: string; sessions: Session[] }
-
-export function bucketSessions(sessions: readonly Session[], now = Date.now()): Bucket[] {
-  const day = 24 * 60 * 60 * 1000
-  const labels = ["Today", "Yesterday", "This week", "Older"]
-  const groups: Session[][] = [[], [], [], []]
-  for (const session of [...sessions].sort((a, b) => b.time.updated - a.time.updated)) {
-    const age = now - session.time.updated
-    const index = age < day ? 0 : age < 2 * day ? 1 : age < 7 * day ? 2 : 3
-    groups[index]?.push(session)
-  }
-  return groups.flatMap((group, index) => (group.length ? [{ label: labels[index] ?? "", sessions: group }] : []))
-}

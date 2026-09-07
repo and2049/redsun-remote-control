@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { bucketSessions, containsPrompt, creatingKey, directoryName, modelLabel, newID, pendingPromptKey, readPending, relativeTime, sessionTitle } from "../src/state"
+import { containsPrompt, creatingKey, directoryName, modelLabel, newID, pendingPromptKey, readPending, relativeTime, sessionTitle } from "../src/state"
 import type { Session } from "../src/types"
 
 function session(id: string, updated: number, overrides: Partial<Session> = {}): Session {
@@ -56,18 +56,4 @@ test("model labels include the variant", () => {
   expect(modelLabel(undefined)).toBe("Default model")
   expect(modelLabel({ id: "gpt", providerID: "openai" })).toBe("gpt")
   expect(modelLabel({ id: "gpt", providerID: "openai", variant: "fast" })).toBe("gpt fast")
-})
-
-test("sessions are bucketed by recency and sorted newest first", () => {
-  const now = 10 * 86_400_000
-  const buckets = bucketSessions([
-    session("old", now - 9 * 86_400_000),
-    session("today-early", now - 3_600_000 * 5),
-    session("today-late", now - 60_000),
-    session("yesterday", now - 86_400_000 - 3_600_000),
-    session("week", now - 4 * 86_400_000),
-  ], now)
-  expect(buckets.map((bucket) => bucket.label)).toEqual(["Today", "Yesterday", "This week", "Older"])
-  expect(buckets[0]?.sessions.map((item) => item.id)).toEqual(["today-late", "today-early"])
-  expect(buckets[3]?.sessions.map((item) => item.id)).toEqual(["old"])
 })
