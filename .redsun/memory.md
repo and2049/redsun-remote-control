@@ -503,7 +503,7 @@ buckets, status dot per row, subline "time · directory · agent", and a floatin
 Chat header (2026-09-07, user request): the title bar is absolutely positioned over the
 transcript with a surface-to-transparent gradient, backdrop blur and a mask that fades the
 blur out, matching the Claude app; the transcript column pads its top so content starts
-below it. The product name is written lowercase ("redsun") in all UI text and the page title.
+below it. The list header uses the same floating treatment over the scrolling list, with the sidebar surface as its gradient start on desktop. The product name is written lowercase ("redsun") in all UI text and the page title.
 
 Restart procedure while the user works remotely: after companion changes, stop the running
 `serve --backend` process tree and start it detached (PowerShell `Start-Process`, hidden,

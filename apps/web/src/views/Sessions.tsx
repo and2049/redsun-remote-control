@@ -31,7 +31,7 @@ export function Sessions({ sessions, active, selected, connection, onSelect, onN
   const visible = sessions.filter((session) => matchesSearch(session, query ?? ""))
   return (
     <aside className="sidebar">
-      <header className="list-header">
+      <header className="floating-header list-header">
         <button className="icon-button" aria-label="Menu" onClick={onMenu}>
           <MenuIcon />
           <span className={`badge ${connection.state}`} aria-label={connection.message ?? connection.state} />

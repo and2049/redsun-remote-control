@@ -53,7 +53,7 @@ export function Chat(props: Props) {
 
   return (
     <section className="chat">
-      <header className="chat-header">
+      <header className="floating-header chat-header">
         <button className="icon-button back" aria-label="Back to sessions" onClick={props.onBack}><BackIcon /></button>
         <div className="heading">
           <strong>{sessionTitle(snapshot.session)}</strong>
