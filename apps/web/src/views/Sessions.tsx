@@ -36,7 +36,7 @@ export function Sessions({ sessions, active, selected, connection, onSelect, onN
           <MenuIcon />
           <span className={`badge ${connection.state}`} aria-label={connection.message ?? connection.state} />
         </button>
-        <h1>Redsun</h1>
+        <h1>redsun</h1>
         <button className={`icon-button${query === undefined ? "" : " active"}`} aria-label="Search sessions" onClick={() => setQuery(query === undefined ? "" : undefined)}><SearchIcon /></button>
       </header>
       {query !== undefined && <input className="search" type="search" placeholder="Search sessions" value={query} onChange={(event) => setQuery(event.target.value)} autoFocus />}

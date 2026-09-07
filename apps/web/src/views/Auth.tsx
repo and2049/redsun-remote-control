@@ -23,7 +23,7 @@ export function Auth({ onSignedIn }: { onSignedIn: () => void }) {
   return (
     <div className="auth">
       <div className="auth-card">
-        <h1>Redsun</h1>
+        <h1>redsun</h1>
         <p>Sign in with the passkey enrolled for this host.</p>
         <button className="button-primary" disabled={busy} onClick={() => run(async () => { await auth.login(); onSignedIn() })}>Sign in with passkey</button>
         <button className="button-secondary" disabled={busy} onClick={() => run(async () => setRegistration(await auth.register()))}>Register this device</button>

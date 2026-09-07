@@ -255,7 +255,7 @@ export function App() {
         ) : selected ? (
           <div className="empty"><p>Loading session…</p></div>
         ) : (
-          <div className="empty"><div><h2>Redsun</h2><p>Pick a session or start a new one.</p></div></div>
+          <div className="empty"><div><h2>redsun</h2><p>Pick a session or start a new one.</p></div></div>
         )}
       </main>
       {sheet?.kind === "new" && <NewSession recent={recent} onCreate={create} onClose={() => setSheet(undefined)} />}
