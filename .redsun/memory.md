@@ -23,8 +23,8 @@ with no commit-body description. Do not include unrelated user work.
 
 ## Implemented foundation
 
-- Bun workspace with `apps/companion` and `packages/protocol`; `apps/web` is a
-  documented boundary, not a frontend scaffold with speculative dependencies.
+- Bun workspace with `apps/companion`, `packages/protocol` and `apps/web`, the React
+  browser client described in the web app section below.
 - Strict TypeScript configuration and Bun tests.
 - Effect-scoped Bun listener, hard-bound to IPv4 loopback. Development uses an
   ephemeral port; authenticated serve mode requires explicit HTTPS origin/port.
@@ -37,12 +37,16 @@ with no commit-body description. Do not include unrelated user work.
   Explicit `serve --backend` now mounts protected backend loading, scoped supervision,
   allowlisted operations, browser refresh streams and a dependency-free diagnostic
   page. The first Windows/iPhone connection through Tailscale is verified below;
-  broader operations and deployment coverage remain pending. Product UI is deferred.
+  broader operations and deployment coverage remain pending. The product web app is
+  implemented and served at `/`; live phone use of it remains unverified.
 
 Approved dependencies: Effect, TypeScript, Bun types. Initial exact pins match the
 locally inspected redsun toolchain: Effect 4.0.0-rc.112, TypeScript 5.8.2, Bun types
 1.3.13; runtime Bun 1.4.0. Subsequently approved: `@simplewebauthn/server` 14.0.1
-(MIT). Frontend dependencies remain unapproved.
+(MIT). Frontend (2026-09-07, user approved): `react` and `react-dom` 19.2.8,
+`react-markdown` 10.1.0, `remark-gfm` 4.0.1 (all MIT), plus `@types/react` 19.2.18 and
+`@types/react-dom` 19.2.7. No Tailwind, Vite, router or state library; the alternatives
+considered were a zero-dependency vanilla client and mirroring inkwash's full stack.
 
 ## Passkey core
 
@@ -433,6 +437,42 @@ Host/Origin, browser WebAuthn JSON helpers, real discovery ACLs and live scoped 
 on Windows. Operations beyond connect, logout/recovery/disable teardown, background
 companion lifecycle and Ubuntu remain unverified live.
 
+### Web app
+
+`apps/web` is the product UI; `docs/web-app.md` documents layout, data flow, prompt
+retention, attachment limits and known gaps. `apps/companion/src/web.ts` bundles
+`apps/web/src/main.tsx` once at startup with `Bun.build` (production React, minified)
+and serves `/`, `/app.js`, `/app.css` through the shared `assets.ts` guard (exact host,
+no query, same-origin fetch metadata, GET only) with CSP `style-src 'self'` and
+`img-src 'self' data:`; the diagnostic moved to `/diagnostic`. Browser code never
+imports companion modules and talks only to `/auth/*` and `/control/*`.
+
+Design decisions: the visual reference is the user's earlier inkwash-2 project
+(React, Tailwind, many dependencies) and the Claude mobile app screenshot; only the
+look was borrowed (light surface `#f9f9f7`, ink `#2d2d2b`, terracotta accent `#cc7d5e`,
+serif transcript prose, sans chrome, dark scheme via `prefers-color-scheme`). Mobile
+(below 48rem) is stack navigation (list, chat with back button, bottom sheets); desktop
+is sidebar plus chat. The browser client is plain async/await rather than Effect,
+following the diagnostic precedent and keeping the bundle small. Refreshes are driven
+by the companion's revision frames with a 30-second backstop and run with the
+background activity header so they never extend idle expiry; user actions refresh in
+the foreground. Prompt IDs are retained in tab sessionStorage before sending; only 400
+and 429 drop retention, any other failure marks the prompt unconfirmed with a Discard
+control, and each refresh reconciles against inbox and history. Prompts sent while the
+agent runs use the backend's default delivery (queued); steer is not exposed yet. The
+newest 200 messages are shown without pagination, and because the scoped stream has no
+token deltas, assistant text appears at refresh cadence rather than streaming.
+
+Verification on 2026-09-07 used a throwaway mock harness (scratchpad only, not in the
+repository) rendering the bundle in Chrome for desktop and a 390px phone frame: session
+list, transcript with markdown/tables/code/tool groups, queued inbox bubble, permission
+and form cards, menu and picker sheets, new-session sheet, sign-in screen and a send
+round trip with retention clearing. Raw HTML in markdown is not emitted. Real phone
+use through Tailscale, light scheme screenshots and WebAuthn in the React sign-in
+screen have not been exercised live yet; the diagnostic remains available for that.
+The Chrome extension dropped some physical clicks during the check; that was tooling,
+not an app defect (programmatic clicks behaved).
+
 ### Protected local backend import implementation
 
 `storage/private-file.ts` and its Windows PowerShell helper implement bounded
@@ -505,9 +545,10 @@ was reported by the user; phone-to-host connectivity has not been verified.
 5. Private deployment: first real phone connection verified 2026-09-06 through
    `bun run phone-test` and Tailscale Serve. Independent background companion lifecycle
    and live exercise of operations/teardown remain pending.
-6. Mobile completion: forms/permissions, moves and models/agents are available via
-   structured diagnostic controls; polished UI remains deferred. Diagnostic refresh
-   and basic retained-ID reconciliation exist, not comprehensive uncertain-write UX.
+6. Mobile completion: the React web app covers sessions, transcript, prompts with
+   attachments, interrupt, permissions, forms, moves and model/agent pickers with
+   retained-ID reconciliation. Pending: live phone verification of the web app, message
+   pagination, steer delivery, session archive/rename, and streaming text.
 
 ## Approved backend completion policies
 
@@ -543,8 +584,8 @@ was reported by the user; phone-to-host connectivity has not been verified.
   browser/authenticator support and needs live verification. An alternative login
   method may be considered later, not implemented now.
 - Backend adapter selection is settled (narrow adapter).
-- Frontend: audit a pinned OpenCode v2 browser source set, licenses, dependency
-  closure, and native integration removal before adding UI dependencies.
+- Frontend: stack settled (React, react-markdown, Bun bundling, plain CSS). Further
+  UI dependencies still need approval.
 - Actual deployment origin/port and any live installation or Tailscale changes still
   require explicit local setup authorization.
 
@@ -563,8 +604,8 @@ brief remains a historical handoff, not the canonical wire contract.
 
 The user authorized backend-independent work while the redsun agent finished, then
 authorized review and integration after it completed.
-Frontend implementation and UI audit are now deferred while the user gathers design
-references. The finalized contract supersedes the provisional schemas inspected earlier.
+The finalized contract supersedes the provisional schemas inspected earlier. The
+frontend was implemented on 2026-09-07 after the user chose inkwash-2 as the reference.
 `@simplewebauthn/server` 14.0.1 (MIT) is approved for authentication. The initial
 crypto-only step exposed no routes; the subsequent explicitly configured serve mode
 now exposes the tested authentication surface, still without Tailscale deployment.
@@ -594,8 +635,9 @@ Discovery/supervision tests cover protected-file rejection, passive CLI status-o
 requests, heartbeat reporting, fresh-process retry, terminal refusal/identity failures,
 and cancellation of stalled requests on scope release. Phone-test helper tests cover
 origin/certificate/Serve-state parsing, pending approval lines and option parsing. The
-full suite now makes 715 assertions across 22 files (239 tests) on Windows; no
-additional dependency was installed.
+web app tests cover pure state/timeline/attachment helpers and static rendering of
+the timeline, approvals and markdown. The full suite now makes 872 assertions across
+27 files (260 tests) on Windows.
 Redsun verification run separately from its core directory:
 `bun run test ../server/test/remote-control.test.ts ../server/test/remote-admission.test.ts ../server/test/remote-projection.test.ts`
 passed 8 tests / 145 assertions. These use its isolated test harness, not the installed
