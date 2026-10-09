@@ -76,7 +76,7 @@ session after a successful durable counter update.
 
 The authentication surface has a process-wide token bucket: burst 30, replenishing
 one request every two seconds. It does not trust forwarded IP headers as a rate-limit
-identity. This bounds work for the initial single-controller scope, but a tailnet
+identity. This bounds work for the initial single-controller scope, but a network
 peer can consume the shared budget; it is not per-device fairness. Binding capacity
 is 128, login challenge capacity 128, pending enrollment capacity 32, session capacity
 64. No backend credentials or owner public-key records are returned by these routes.

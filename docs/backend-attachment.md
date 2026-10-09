@@ -11,10 +11,10 @@ directory, reads only its configured password-free discovery path, and performs
 one scoped `GET /api/remote`. It validates durable backend identity, registration
 process identity, supported version, enrollment and enabled policy. The network
 request has a five-second deadline. Success means scoped status access worked at
-that instant, not that remote browser operations or Tailscale are ready.
+that instant, not that remote browser operations or the host HTTPS route is ready.
 
 The command does not start a listener, send a heartbeat, enable remote control,
-create enrollment, change Tailscale, or start/stop/replace redsun. It prints no
+create enrollment, configure a tunnel or public listener, or start/stop/replace redsun. It prints no
 credential, discovery path, backend URL or backend response body. It accepts no
 arbitrary endpoint argument. A failed check exits nonzero without retries.
 
@@ -69,7 +69,7 @@ streams, not merely cookies. Background traffic does not extend login idle lifet
 
 The companion-side diagnostic slice is implemented. Before exposure, real-redsun
 integration and Windows discovery permissions still need verification, followed by
-explicit approval of live enrollment/enablement, HTTPS origin, port and Serve mapping.
+explicit approval of live enrollment/enablement, host-provided HTTPS origin, loopback port and host route.
 See [phone-test preflight](phone-test.md) for the exact mode, API limits and remaining
 verification. Plain `bun dev` remains health-only; no automatic service setup or
-Tailscale change is performed.
+networking change is performed.

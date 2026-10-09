@@ -1,14 +1,13 @@
 # Redsun Remote Control
 
 A private, browser-based remote interface for an existing background redsun server,
-using Tailscale for connectivity. Initially: one host and one remote controller.
+using a host-provided HTTPS origin. Initially: one host and one remote controller.
 
 **Diagnostic vertical slice implemented:** passkey authentication, supervised backend
 attachment, allowlisted remote operations and a dependency-free phone diagnostic page
-are available in explicit `serve --backend` mode. Real-redsun, browser and Tailscale
-integration remain unverified. Complete the [phone-test preflight](docs/phone-test.md)
-before private exposure. Never use Funnel, a LAN binding or a public proxy.
-`bun run phone-test` automates the host side of that test after one confirmation.
+are available in explicit `serve --backend` mode. Further real-redsun and browser integration remains to be verified. Complete the [phone-test preflight](docs/phone-test.md)
+before private exposure. The companion binds plain HTTP to IPv4 loopback only; redsun owns the public HTTPS listener and terminates its OpenTunnel route in the service process. The companion never configures networking.
+`bun run phone-test --origin https://host.example` starts a local diagnostic against an already configured backend and host route.
 
 ## Development
 

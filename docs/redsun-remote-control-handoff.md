@@ -7,9 +7,8 @@ companion. Inspect the current redsun code and applicable repository instruction
 before editing. This document specifies behavior, not assumed service names or
 endpoint paths. Reuse existing architecture where possible.
 
-The companion repository currently contains only a strict TypeScript/Bun workspace,
-an Effect-managed loopback health listener, and tests. It has no browser UI,
-authentication, backend attachment, or Tailscale exposure yet.
+This is a historical backend implementation brief. The companion now has a browser UI,
+authentication and backend attachment; its listener remains IPv4 loopback-only.
 
 Deliver backend changes, tests, and an integration contract the companion agent can
 implement against. Do not implement the companion or browser application here.
@@ -18,8 +17,9 @@ implement against. Do not implement the companion or browser application here.
 
 - Initial scope: one redsun host and one remote controlling device. Leave reasonable
   room for future multiple controllers/hosts without implementing a gateway.
-- Connectivity uses installed Tailscale and private Tailscale Serve HTTPS, never
-  Funnel or a public endpoint. Do not change Tailscale configuration in this task.
+- The redsun service owns the HTTPS public listener through an OpenTunnel route,
+  terminates TLS and forwards plain HTTP to the companion on IPv4 loopback.
+  The companion never configures networking or binds off loopback.
 - Browser control uses backend APIs, not terminal mirroring.
 - Remote access is independent of the TUI lifetime and active session. It must work
   from Home, with no session, and continue if the TUI exits while the server survives.
@@ -40,10 +40,10 @@ normal tool permissions, and TUI controls/status. The companion owns the browser
 browser authentication/enrollment, browser session revocation, and the remote HTTP
 gateway. Provider credentials and agent history remain in redsun.
 
-Tailscale membership grants network reachability, not automatic permission to
+Tunnel reachability grants network access, not automatic permission to
 control redsun. A network address or caller-supplied header is not authentication.
 
-The threat model includes unauthorized browsers/tailnet peers and a compromised
+The threat model includes unauthorized browsers/network peers and a compromised
 remote client attempting operations beyond the permitted API surface. The companion
 is a trusted local process handling sensitive material. A scoped backend credential
 limits protocol authority; it does not sandbox a malicious process running as the
@@ -156,7 +156,7 @@ clear stale connection status after companion failure. Only an authorized compan
 may update its own status. Do not persist transient status across backend restarts.
 
 The status is companion-reported observation, not proof that the phone can reach
-the host or that Tailscale is healthy. Browser-connected must mean an authenticated
+the host or that the host HTTPS route is healthy. Browser-connected must mean an authenticated
 application connection, not just a TCP connection.
 
 Status bookkeeping must not create a hidden remote-control exception while disabled.
@@ -177,7 +177,7 @@ It must not submit a model prompt or rely on an active session.
 - Offer credential revocation separately from normal disablement, with clear wording.
 - Use the backend's effective state rather than a TUI-only preference.
 - Preserve state and indicator semantics across `/cd` and session navigation.
-- Do not install Tailscale, change Serve/Funnel settings, download the companion, or
+- Do not configure a tunnel or public listener, download the companion, or
   make companion lifecycle depend on the TUI process.
 
 Follow existing branding, configuration, command, and TUI layout conventions.
@@ -229,13 +229,13 @@ Include unit tests plus integration tests through the real authenticated API sea
 18. Generated clients and relevant typechecks pass.
 
 Use isolated temporary credentials and fixtures, never the developer's actual
-service registration, Tailscale network, or provider credentials. Remove temporary
+service registration, public route, or provider credentials. Remove temporary
 files after verification. Do not stop/restart the user's real backend for tests.
 
 ## Out of scope
 
 - Browser UI, browser passkeys/TOTP, recovery, and browser enrollment implementation.
-- Tailscale installation/configuration or public network exposure.
+- Tunnel configuration or public network exposure.
 - Multi-host gateway, host aggregation, or multi-user roles.
 - Automatic companion distribution, installation, or process supervision.
 - Duplicating redsun session storage or implementing another agent runtime.

@@ -3,9 +3,10 @@
 ## Purpose and approved scope
 
 Build a private mobile/desktop browser interface for an existing redsun background
-server. Tailscale is the selected transport; no public exposure, custom VPN, or
-always-available gateway. Start with one host and one remote controller. Preserve
-room for multiple hosts/controllers without implementing aggregation now.
+server. The redsun host owns the HTTPS public listener (an OpenTunnel route
+terminated in its service process) and forwards plain HTTP to the companion on
+IPv4 loopback. The companion never configures networking. Start with one host
+and one remote controller. Preserve room for multiple hosts/controllers without implementing aggregation now.
 
 The browser is a separate agent client, not terminal mirroring. Closing or crashing
 the TUI must not stop remote work if the backend remains alive. Agent state and
@@ -106,7 +107,7 @@ events now invalidate browser authorization through supervision.
 Authentication HTTP/CLI wiring is implemented in the explicit serve mode described
 below; no-argument mode remains health-only. Legacy `/auth/register` and `/auth/login`
 paths stay unavailable. `serve --backend` separately mounts the allowlisted control
-surface described below. Before Tailscale exposure, complete real-redsun and permission
+surface described below. Before host-route exposure, complete real-redsun and permission
 preflight and obtain explicit local deployment authorization.
 
 ### Browser session lifetime core
@@ -218,10 +219,12 @@ The first real Tailscale/iPhone connection is recorded in the phone-test section
 
 ## Architecture direction
 
-Browser → private Tailscale HTTPS/Serve → loopback companion → authenticated local
-redsun server. Serve, not Funnel. One origin for assets and APIs. Do not expose an
-unauthenticated backend proxy. Route and event authorization must precede exposure.
-Backend credentials never reach the browser. Tailscale membership alone is not
+Browser → redsun-hosted HTTPS/OpenTunnel route → plain HTTP on IPv4 loopback
+companion → authenticated local redsun server. redsun terminates TLS and supplies
+`serveCompanion({ origin, port, backend })` with the public HTTPS origin; the companion
+never configures a tunnel or public listener. One origin for assets and APIs. Do not
+expose an unauthenticated backend proxy. Route and event authorization must precede
+exposure. Backend credentials never reach the browser. Network reachability is not
 application enrollment.
 
 Keep backend access behind the companion's backend module when it is added. Do not
@@ -412,15 +415,14 @@ verified real attachment, Tailscale Host preservation, discovery ACLs and browse
 
 ### Phone-test automation
 
-`apps/companion/script/phone-test.ts` (`bun run phone-test`) automates the host side of
-the phone test; pure helpers live in `phone-test-lib.ts` with unit tests. It is a plain
-Bun child-process script rather than Effect because it only sequences external CLIs and
-relays an interactive stdin. It gates on the MagicDNS name appearing in Tailscale's
-certificate domains, refuses unrelated Serve mappings, asks once, then restarts the local
-source service if it lacks RC, enrolls/imports when `backend.json` is absent (deleting the
-temporary handoff after import), enables policy, runs `check-backend`, applies the
-tailnet-only Serve mapping, and runs `serve --backend` with automatic `enroll`/`pending`
-polling. Fingerprint approval remains a typed human step.
+`apps/companion/script/phone-test.ts` (`bun run phone-test --origin https://...`)
+requires the host-provided HTTPS origin, accepts `--port` (default 43123), runs
+`check-backend`, starts `serve --backend` on IPv4 loopback, and relays local stdin
+with automatic `enroll`/`pending` polling. Fingerprint approval remains a typed
+human step. It does not inspect/configure a tunnel or start, stop or replace redsun.
+The original 2026-09-06 automation used Tailscale Serve and also managed the local
+source service; the historical verification below describes that run, not today's
+script.
 
 Live host findings on 2026-09-06: two managed services exist, the installed release
 binary (the user's main one) and a source checkout `serve --service` (channel local,
@@ -551,28 +553,32 @@ not an app defect (programmatic clicks behaved).
   `dataDirectory`, `parseCommand`, `validateServe`, `StorageError`, `Health`.
   Programmatic errors surface their own messages rather than Effect's generic
   `Effect.try` wrapper.
-- 0.2.0 (2026-09-07): `serveCompanion` exposes `local` (structured approval API) and
-  `src/tailscale.ts` provides `inspectTailscale`/`applyServe`/`serveCommand` (moved
-  from the phone-test script) so redsun can host the companion in-process: the user
-  chose that enabling remote control in redsun starts the companion inside the
+- 0.2.0 (2026-09-07): `serveCompanion` exposed `local` (structured approval API);
+  the then-present `src/tailscale.ts` provided transport helpers for in-process hosting.
+  The user chose that enabling remote control in redsun starts the companion inside the
   managed service, disabling stops it, passkey approval moves into the `/remote`
-  dialog, and the Tailscale Serve mapping is a one-key dialog action with
-  confirmation (never automatic). The supervisor still stops permanently on policy
-  refusal (401/403); redsun restarts a fresh companion on enable, and the stop reason
+  dialog. At the time, Tailscale Serve mapping was a confirmed dialog action.
+  The supervisor still stops permanently on policy refusal (401/403); redsun restarts a fresh companion on enable, and the stop reason
   is now logged to stderr via `onStop`.
 - 0.3.0: `removeHandoff` and `serveCompanion().backend()` were added after the user's
   fresh-install rehearsal: revoking on the backend left the companion's stale
   `backend.json` in place, so the auto-started companion was refused (supervisor stopped
   silently, dialog said only unavailable) and re-enrollment was blocked by never-overwrite.
   redsun now clears the store on revoke and reports a stopped supervisor as an error.
+- 0.4.0: the Tailscale module and exports are removed; the host stops importing them.
+  `serveCompanion({ origin, port, backend })` is unchanged. redsun supplies the HTTPS
+  origin, owns the public listener and terminates its OpenTunnel route in the service
+  process; the companion binds plain HTTP on IPv4 loopback and never configures
+  networking.
 - In-process hosting verified live on 2026-09-07: redsun commit `0e1b993cc7` adds
   `origin`/`port` to the host-local `remote_control` settings, starts the companion inside
   the managed service when enabled, enrolled and configured (stops on disable/revoke,
   restarts after enrollment or origin change), exposes local-only routes
   (`/api/remote/companion` GET/PUT, `/registration` POST/DELETE, `/approval` POST,
-  `/api/remote/tailscale` GET/POST) that stay off the scoped allowlist, and the `/remote`
+  `/api/remote/tailscale` GET/POST) that stayed off the scoped allowlist, and the `/remote`
   dialog prompts for the origin on first enable, registers/approves phones by fingerprint
-  and maps Tailscale Serve only after confirmation. The standalone companion process on the
+  and mapped Tailscale Serve only after confirmation. The standalone companion
+  process on the
   test host was retired; the service now serves the phone on port 43123, so restarting the
   local redsun service also restarts the companion (phone signs in again). Web UI changes
   reach the phone only through a rebuilt package installed into redsun (tarball or
@@ -582,8 +588,8 @@ not an app defect (programmatic clicks behaved).
   dialog was redesigned per `.redsun/plans/remote-control-host-ux.md` (dynamic
   options, coloured state, per-state guidance, in-dialog enrollment). The follow-up
   wires `redsun remote companion ...` to `main` and switches TUI enrollment to
-  `importHandoff` with exact `redsun remote companion serve` and `tailscale serve`
-  commands plus Tailscale docs links in the dialog. Tailscale itself stays manual.
+  `importHandoff`; the original dialog displayed manual transport commands.
+  The current host uses its own OpenTunnel route instead.
   Until 0.1.0 is published, redsun's `bun install --frozen-lockfile` cannot resolve
   the pin; publish first, then refresh redsun's lockfile.
 
@@ -613,7 +619,7 @@ stores `backend.json` in `%LOCALAPPDATA%/redsun-remote-control` or
 directory must exist; only the final private directory is created. No arbitrary
 destination CLI option exists. The source is always preserved; explicit optional
 source deletion remains pending. Import performs no network requests, backend
-enrollment, enablement, listener startup, or Tailscale changes. Invalid handoffs are
+enrollment, enablement, listener startup, or networking changes. Invalid handoffs are
 rejected before creating the destination. No-argument CLI remains health-only.
 
 Windows permission and CLI behavior is tested with disposable synthetic fixtures
@@ -657,7 +663,7 @@ was reported by the user; phone-to-host connectivity has not been verified.
    Windows. Policy/event teardown and control authorization are wired and tested with
    synthetic servers. Deployment preflight remains required before private exposure.
 5. Private deployment: first real phone connection verified 2026-09-06 through
-   `bun run phone-test` and Tailscale Serve. Independent background companion lifecycle
+   the original `bun run phone-test` and Tailscale Serve. Independent background companion lifecycle
    and live exercise of operations/teardown remain pending.
 6. Mobile completion: the React web app covers sessions, transcript, prompts with
    attachments, interrupt, permissions, forms, moves and model/agent pickers with
@@ -686,7 +692,7 @@ was reported by the user; phone-to-host connectivity has not been verified.
 - Configure HTTPS origin and loopback port explicitly; no hostname inference or port
   substitution. Origin changes require local reset/re-enrollment. Provide foreground
   operation and background-install instructions, not automatic service installation
-  or Tailscale changes.
+  or networking changes.
 - Challenge windows are five minutes, with bounded pending requests and tested auth
   rate limits. These are approved direction, not implemented end-to-end behavior.
 
@@ -700,7 +706,7 @@ was reported by the user; phone-to-host connectivity has not been verified.
 - Backend adapter selection is settled (narrow adapter).
 - Frontend: stack settled (React, react-markdown, Bun bundling, plain CSS). Further
   UI dependencies still need approval.
-- Actual deployment origin/port and any live installation or Tailscale changes still
+- Actual deployment origin/port and any live installation or host route changes still
   require explicit local setup authorization.
 
 ## Redsun handoff
@@ -722,13 +728,14 @@ The finalized contract supersedes the provisional schemas inspected earlier. The
 frontend was implemented on 2026-09-07 after the user chose inkwash-2 as the reference.
 `@simplewebauthn/server` 14.0.1 (MIT) is approved for authentication. The initial
 crypto-only step exposed no routes; the subsequent explicitly configured serve mode
-now exposes the tested authentication surface, still without Tailscale deployment.
+now exposes the tested authentication surface without configuring networking.
 
 ## Verification
 
 Run from repository root: `bun install --frozen-lockfile`, `bun run typecheck`,
 `bun test`. Development: `bun run dev` (ephemeral loopback health listener only).
-Current verification: frozen install and typecheck pass; 239 tests, 0 failures,
+Current verification on Linux: frozen install and typecheck pass; 271 tests pass,
+1 skipped, 0 failures, and the package build emits no transport module artifact;
 including real WebAuthn registration and signed authentication for three algorithms,
 negative security cases, concurrency, invalidation, listener cleanup, and scoped
 attachment fixtures (redirect refusal, proxy isolation, identity/restart checks,
@@ -747,8 +754,8 @@ in-flight authorization, CSRF/Host validation, request limits, rate limits, leas
 exclusion, and lock release after an actual synthetic companion process is killed.
 Discovery/supervision tests cover protected-file rejection, passive CLI status-only
 requests, heartbeat reporting, fresh-process retry, terminal refusal/identity failures,
-and cancellation of stalled requests on scope release. Phone-test helper tests cover
-origin/certificate/Serve-state parsing, pending approval lines and option parsing. The
+and cancellation of stalled requests on scope release. Phone-test helper tests cover pending approval lines and explicit HTTPS origin/port
+option parsing. The
 web app tests cover pure state/timeline/attachment helpers and static rendering of
 the timeline, approvals and markdown. The full suite now makes 872 assertions across
 31 files (276 tests) on Windows. Packaging tests cover in-process handoff import,

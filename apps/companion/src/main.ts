@@ -37,7 +37,7 @@ export async function main(args: readonly string[], options: MainOptions): Promi
       }
       if (command.kind === "serve") {
         const companion = yield* serveCompanion(command)
-        console.log(command.backend ? "Diagnostic listener ready on loopback. Backend readiness requires valid discovery, scoped SSE and heartbeat. No Tailscale setup was performed." : "Authentication listener ready on the configured loopback port. Backend routes and Tailscale setup remain unavailable.")
+        console.log(command.backend ? "Diagnostic listener ready on loopback. Backend readiness requires valid discovery, scoped SSE and heartbeat. The host owns the HTTPS listener." : "Authentication listener ready on the configured loopback port. Backend routes are unavailable; the host owns the HTTPS listener.")
         console.log("Local commands: enroll | pending | approve <requestID> <fingerprint> | cancel | recover confirm")
         const input = yield* Effect.acquireRelease(
           Effect.sync(() => createInterface({ input: process.stdin, crlfDelay: Infinity, terminal: false })),

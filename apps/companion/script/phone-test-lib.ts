@@ -1,15 +1,9 @@
 import { Schema } from "effect"
-export { certificateReady, serveState, tailnetHost } from "../src/tailscale"
+import { validateServe } from "../src/command"
 
 const PendingRequests = Schema.Array(Schema.Struct({ requestID: Schema.String, fingerprint: Schema.String }))
 
-const RemoteStatus = Schema.Struct({ supported: Schema.Boolean, enabled: Schema.Boolean, enrolled: Schema.Boolean })
-
-export type Options = { readonly redsun: string; readonly port: number }
-
-export function remoteStatus(text: string): { readonly supported: boolean; readonly enabled: boolean; readonly enrolled: boolean } {
-  return Schema.decodeUnknownSync(RemoteStatus)(JSON.parse(text))
-}
+export type Options = { readonly origin: string; readonly port: number }
 
 export function approveCommands(line: string): readonly string[] | undefined {
   if (!line.startsWith("[")) return undefined
@@ -21,14 +15,20 @@ export function approveCommands(line: string): readonly string[] | undefined {
   }
 }
 
-export function parseOptions(args: readonly string[], defaults: Options): Options {
-  let options = defaults
+export function parseOptions(args: readonly string[]): Options {
+  let origin: string | undefined
+  let port = 43123
   for (let index = 0; index < args.length; index += 2) {
     const flag = args[index]
     const value = args[index + 1]
-    if (flag === "--redsun" && value) options = { ...options, redsun: value }
-    else if (flag === "--port" && value && /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 65535) options = { ...options, port: Number(value) }
-    else throw new Error("Usage: phone-test [--redsun <checkout>] [--port <loopback-port>]")
+    if (flag === "--origin" && value && origin === undefined) origin = value
+    else if (flag === "--port" && value && /^\d+$/.test(value)) port = Number(value)
+    else throw new Error("Usage: phone-test --origin <https-origin> [--port <loopback-port>]")
   }
-  return options
+  if (!origin) throw new Error("Usage: phone-test --origin <https-origin> [--port <loopback-port>]")
+  try {
+    return validateServe(origin, port)
+  } catch {
+    throw new Error("Usage: phone-test --origin <https-origin> [--port <loopback-port>]")
+  }
 }

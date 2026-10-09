@@ -24,10 +24,10 @@ verifies connection and authentication, not every operation or deployment platfo
    owner-only ACL; a service started from an older checkout inherits the state
    directory's Windows ACL and fails discovery as unavailable. Do not silently repair
    files or relax companion checks; fix the backend and restart it explicitly.
-4. Select the real tailnet HTTPS origin and an unused loopback port. The tailnet must
-   have HTTPS certificates enabled (Tailscale admin console, DNS page) or the origin
-   cannot exist and passkeys cannot work. Approve the exact private Serve configuration
-   locally. Never use Funnel or a public listener.
+4. Select the HTTPS origin supplied by the redsun host and an unused IPv4 loopback
+   port. The host owns the public listener: its OpenTunnel route terminates TLS in the
+   redsun service process and forwards plain HTTP to the companion on loopback.
+   Verify that route separately. The companion never configures networking.
 
 New deployments and additional live policy/service changes still need these approvals
 and environment checks; the first phone connection has completed this preflight.
@@ -36,32 +36,28 @@ No machine-specific settings, handoffs or private hostnames belong in this repos
 ## Automated host-side run
 
 ```text
-bun run phone-test [--redsun <redsun-checkout>] [--port <loopback-port>]
+bun run phone-test --origin https://host.example [--port <loopback-port>]
 ```
 
-The script derives the origin from this host's MagicDNS name, refuses to continue
-until that name appears in Tailscale's certificate domains, and refuses any unrelated
-existing Serve mapping. It then prints exactly which host-local changes it will make
-and asks once before proceeding: restart the local source redsun service when the
-running one lacks remote control, enroll and import a handoff when `backend.json` is
-absent (the temporary handoff is deleted after import), enable RC policy when disabled,
-run `check-backend`, add the tailnet-only Serve mapping to the loopback port, and start
-`serve --backend` in the foreground. It never touches the installed release service,
-Funnel, or other Serve mappings.
+The script requires an explicit HTTPS origin and defaults to port 43123. It runs
+`check-backend`, starts `serve --backend` on IPv4 loopback and prints phone steps.
+It does not inspect or configure the host's tunnel, TLS, public listener, service
+policy or backend lifecycle. Set up and verify the host route and backend separately,
+with explicit local authorization. The host must preserve the configured Host and
+browser Origin headers.
 
-While the companion runs, the script relays typed local commands to it. On first use it
-sends `enroll` automatically and polls `pending` until the phone's registration appears,
-then prints the exact `approve <requestID> <fingerprint>` line. Compare the complete
-fingerprint with the phone before typing it; the script never approves on its own.
-Typing `enroll` reopens the five-minute window. Ctrl+C stops the companion; remove the
-mapping afterwards with `tailscale serve reset` if nothing else uses Serve.
+While the companion runs, the script relays typed local commands. On first use it
+sends `enroll` and polls `pending`, then prints the exact
+`approve <requestID> <fingerprint>` line. Compare the complete fingerprint with the
+phone before typing it; the script never approves on its own. Typing `enroll`
+reopens the five-minute window. Ctrl+C stops the companion.
 
 ## Foreground diagnostic run
 
 Substitute the selected origin and port:
 
 ```text
-bun run dev serve --origin https://host.example.ts.net --port 43123 --backend
+bun run dev serve --origin https://host.example --port 43123 --backend
 ```
 
 Keep this process and its local stdin open. It loads protected backend enrollment,
@@ -72,17 +68,15 @@ identity or contract failure stops that supervisor instance: correct the problem
 locally and restart the companion, without implicitly restarting redsun.
 
 Plain `bun run dev` still exposes only loopback health. `serve` without `--backend`
-still provides authentication only. No mode configures TLS, Tailscale or redsun.
+still provides authentication only. No mode configures TLS, a tunnel, a public listener or redsun.
 
-After the preflight and explicit local approval, the intended Serve mapping is
-private tailnet HTTPS to `http://127.0.0.1:43123`. Check the installed Tailscale CLI's
-`serve --help` and existing Serve configuration before applying that mapping; do not
-reset or replace unrelated mappings. The proxy must preserve the selected Host and
-browser Origin. The companion intentionally rejects mismatches.
+The redsun host must forward its HTTPS route to `http://127.0.0.1:43123`
+(or the chosen port), preserving the configured Host and browser Origin. The
+companion intentionally rejects mismatches and never binds off loopback.
 
 ## Phone sequence
 
-1. Connect the phone to the same tailnet and open `/diagnostic` at the selected HTTPS origin. A modern
+1. Reach the host HTTPS origin and open `/diagnostic` at the selected HTTPS origin. A modern
    browser supporting WebAuthn JSON helpers (`parseCreationOptionsFromJSON`,
    `parseRequestOptionsFromJSON`, and credential `toJSON`) is required by this testing
    page. Unsupported browsers receive a diagnostic error; no insecure login fallback
@@ -161,7 +155,7 @@ uses a restrictive CSP, and contains no third-party script or frontend dependenc
 ## Remaining verification
 
 The first connection verified real Windows discovery ACLs, scoped attachment,
-Tailscale Host/Origin preservation and Safari WebAuthn. Next exercise session creation,
+historical Tailscale Serve Host/Origin preservation and Safari WebAuthn. Next exercise session creation,
 prompts, history, interruption, moves, models/agents, permissions/forms and reconnect
 with uncertain submissions. Verify logout/recovery/backend disable or revocation close
 authorization without cancelling admitted work. Policy changes need local approval.

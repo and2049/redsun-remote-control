@@ -53,13 +53,10 @@ environment variable instead of a script parameter.
 - `serveCompanion` also yields `local`, the structured approval API (`open`, `pending`,
   `approve(requestID, fingerprint)`, `cancel`, `recover`) so a host can drive phone
   registration from its own UI instead of the stdin commands.
-- `inspectTailscale(port)`: runs `tailscale status --json` and `tailscale serve status
-  --json` and reports the MagicDNS host, the HTTPS origin, whether certificates are
-  enabled and whether the Serve mapping for the port is `missing`, `ready` or
-  `conflict`. `applyServe(port)` applies `tailscale serve --bg --https=443
-  http://127.0.0.1:<port>` only when the mapping is missing and certificates exist;
-  it refuses conflicts. `serveCommand(port)` is the display string. Both accept an
-  injectable runner for tests and never reset existing Serve configuration.
+- The companion listens on IPv4 loopback over plain HTTP. redsun supplies the HTTPS
+  `origin` to `serveCompanion` and owns the public listener: its OpenTunnel route is
+  terminated in the redsun service process and forwarded to the loopback port. The
+  companion never inspects or configures transport or public networking.
 - `removeHandoff(directory?)`: deletes the stored handoff (no-op when absent) so a host
   that revoked companion credentials can enroll again. `serveCompanion` also yields
   `backend()`, the supervisor snapshot (`connecting`, `ready`, `unavailable`, `stopped`
