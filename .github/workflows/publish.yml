@@ -15,12 +15,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.0
+          # The version that wrote bun.lock; keep in step with packageManager in package.json.
+          bun-version: 1.4.2
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
       - run: bun install --frozen-lockfile
+      # The web app's dependencies are linked per workspace; the asset build and the web tests need them.
+      - run: ls -la apps/web/node_modules apps/companion/node_modules && bun pm ls
       - run: bun run typecheck
       - run: bun test
       - run: bun run build
